@@ -1,18 +1,17 @@
 {
   "name": "Mis Pagos",
   "short_name": "Mis Pagos",
-  "description": "Gestión financiera personal",
-  "start_url": "./index.html",
+  "description": "Control de ingresos y tasas",
+  "start_url": "index.html",
   "display": "standalone",
-  "background_color": "#0f3460",
+  "background_color": "#f0f2f5",
   "theme_color": "#0f3460",
   "orientation": "portrait",
   "icons": [
     {
-      "src": "icon.png",
+      "src": "icons/app-icon.png",
       "sizes": "512x512",
-      "type": "image/png",
-      "purpose": "any maskable"
+      "type": "image/png"
     }
   ]
 }
