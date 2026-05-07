@@ -8,9 +8,11 @@
   <meta name="apple-mobile-web-app-capable" content="yes">
   <meta name="application-name" content="Mis pagos">
   <meta name="apple-mobile-web-app-title" content="Mis pagos">
-  <meta name="theme-color" content="#0f3460"> 
-  <meta name="msapplication-navbutton-color" content="#0f3460">
+  <meta name="theme-color" content="#0f3460"> <meta name="msapplication-navbutton-color" content="#0f3460">
   <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="icons/app-icon.png">
 
   <title>Mis pagos</title>
   
@@ -39,19 +41,6 @@
       color: #333;
       -webkit-text-size-adjust: 100%;
       overscroll-behavior-y: contain;
-    }
-
-    #pin-screen {
-      position: fixed;
-      top: 0; left: 0; width: 100%; height: 100%;
-      background: var(--primary);
-      display: flex;
-      flex-direction: column;
-      justify-content: center;
-      align-items: center;
-      z-index: 10000;
-      color: white;
-      text-align: center;
     }
 
     * { -webkit-tap-highlight-color: transparent; }
@@ -89,6 +78,7 @@
       border-radius: 10px; 
       margin-bottom: 12px; 
       box-sizing: border-box;
+      -webkit-appearance: none;
       background-color: white;
     }
     
@@ -104,12 +94,13 @@
       justify-content: center; 
       align-items: center; 
       gap: 8px;
+      touch-action: manipulation;
     }
     .btn-main { background: var(--primary); color: white; }
     
     .chart-container { height: 250px; width: 100%; margin-top: 10px; }
 
-    .table-container { overflow-x: auto; margin-top: 10px; }
+    .table-container { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
     th { background: #f4f6f8; padding: 8px; text-align: left; white-space: nowrap; }
     td { padding: 8px; border-bottom: 1px solid #eee; }
@@ -128,17 +119,12 @@
     .tasa-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; align-items: center; }
     .tasa-header { font-weight: bold; font-size: 0.8rem; color: var(--primary); margin-bottom: 5px; }
     .mes-label { font-size: 0.85rem; font-weight: bold; color: #555; }
-    .tasa-input { margin-bottom: 0 !important; }
+    .tasa-input { margin-bottom: 0 !important; font-size: 14px !important; padding: 8px; }
 
     .cesta-tasas-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; display: none; margin-bottom: 10px; }
   </style>
 </head>
 <body>
-
-  <div id="pin-screen">
-    <h2 style="margin-bottom:10px;">🔒 ACCESO</h2>
-    <p style="font-size: 0.8rem; opacity: 0.8;">Introduce tu PIN para continuar</p>
-  </div>
 
   <div class="header-container">
     <div class="top-bar"></div>
@@ -243,42 +229,20 @@
       </table>
     </div>
     <button style="background:var(--excel); color:white; margin-top:15px;" onclick="exportarTodo()">⬇️ Exportar Respaldo Total</button>
-    <input type="file" id="file-input" style="display:none;" accept=".csv" onchange="importarTodo(this)">
+    <input type="file" id="file-input" style="display:none;" accept=".csv,text/csv,.txt" onchange="importarTodo(this)">
     <button style="background:var(--import); color:white; margin-top:10px;" onclick="document.getElementById('file-input').click();">📂 Importar Respaldo Total</button>
     <button style="background:var(--danger); color:white; margin-top:10px;" onclick="limpiarTodo()">🗑️ Borrar Todo</button>
   </details>
 
   <script>
-    // --- LÓGICA DE SEGURIDAD PIN ---
-    function aplicarSeguridad() {
-      const pinGuardado = localStorage.getItem('app_user_pin');
-      if (!pinGuardado) {
-        const nuevoPin = prompt("Establece un PIN de seguridad:");
-        if (nuevoPin) {
-          localStorage.setItem('app_user_pin', nuevoPin);
-          document.getElementById('pin-screen').style.display = 'none';
-        } else {
-          location.reload();
-        }
-      } else {
-        const ingreso = prompt("Ingresa tu PIN:");
-        if (ingreso === pinGuardado) {
-          document.getElementById('pin-screen').style.display = 'none';
-        } else {
-          alert("PIN incorrecto");
-          aplicarSeguridad();
-        }
-      }
-    }
-    aplicarSeguridad();
-
     const NOMBRES_DIAS = ["Dom", "Lun", "Mar", "Mié", "Jue", "Vie", "Sáb"];
     const NOMBRES_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     
     let chartInstance = null;
-    let semanas = JSON.parse(localStorage.getItem('pagosSemanalesAlpla')) || [];
-    let tasasOf = JSON.parse(localStorage.getItem('tasasOficialesAlpla')) || {1:40,2:42,3:45,4:48,5:48,6:48,7:48,8:48,9:48,10:48,11:48,12:48};
-    let tasasPar = JSON.parse(localStorage.getItem('tasasNegroAlpla')) || {1:48,2:51,3:55,4:60,5:60,6:60,7:60,8:60,9:60,10:60,11:60,12:60};
+    // Claves de base de datos actualizadas para remover rastros anteriores
+    let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
+    let tasasOf = JSON.parse(localStorage.getItem('tasasOficiales')) || {1:40,2:42,3:45,4:48,5:48,6:48,7:48,8:48,9:48,10:48,11:48,12:48};
+    let tasasPar = JSON.parse(localStorage.getItem('tasasParalelo')) || {1:48,2:51,3:55,4:60,5:60,6:60,7:60,8:60,9:60,10:60,11:60,12:60};
 
     function formatear(n) { return new Intl.NumberFormat('es-VE').format(n); }
 
@@ -348,31 +312,26 @@
       renderizarTasas();
     }
 
-    // --- FUNCIÓN DE EDICIÓN CORREGIDA ---
     function editarReg(i) {
-      const registro = semanas[i];
-      
-      const nuevaFecha = prompt("Nueva fecha (AAAA-MM-DD):", registro.fecha);
-      if (!nuevaFecha) return;
+      const nf = prompt("Nueva fecha (AAAA-MM-DD):", semanas[i].fecha);
+      if (nf) {
+        const nm = parseFloat(prompt("Nuevo monto (Bs):", semanas[i].monto_bs));
+        if(!isNaN(nm)) {
+          semanas[i].fecha = nf; 
+          semanas[i].monto_bs = nm;
+          
+          if(semanas[i].tipo === 'Cestaticket') {
+            const ntOf = parseFloat(prompt("Nueva Tasa BCV:", semanas[i].tasa_sem_of || ""));
+            const ntPa = parseFloat(prompt("Nueva Tasa Par.:", semanas[i].tasa_sem_pa || ""));
+            if(!isNaN(ntOf)) semanas[i].tasa_sem_of = ntOf;
+            if(!isNaN(ntPa)) semanas[i].tasa_sem_pa = ntPa;
+          }
 
-      const nuevoMonto = parseFloat(prompt("Nuevo monto (Bs):", registro.monto_bs));
-      if (isNaN(nuevoMonto)) return;
-
-      // Aplicamos cambios básicos
-      registro.fecha = nuevaFecha;
-      registro.monto_bs = nuevoMonto;
-
-      // Si es Cestaticket, permitimos editar sus tasas propias
-      if (registro.tipo === 'Cestaticket') {
-        const nuevaTasaOf = parseFloat(prompt("Nueva Tasa BCV:", registro.tasa_sem_of || ""));
-        const nuevaTasaPa = parseFloat(prompt("Nueva Tasa Par.:", registro.tasa_sem_pa || ""));
-        if (!isNaN(nuevaTasaOf)) registro.tasa_sem_of = nuevaTasaOf;
-        if (!isNaN(nuevaTasaPa)) registro.tasa_sem_pa = nuevaTasaPa;
+          semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
+          localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+          actualizarInterfaz();
+        }
       }
-
-      semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
-      localStorage.setItem('pagosSemanalesAlpla', JSON.stringify(semanas));
-      actualizarInterfaz();
     }
 
     function actualizarGrafico() {
@@ -395,16 +354,17 @@
 
     function agregarSemana() {
       const f = document.getElementById('fecha').value, m = parseFloat(document.getElementById('monto_bs').value), t = document.getElementById('tipo_ingreso').value;
-      const tOfV = parseFloat(document.getElementById('tasa_cesta_of').value), tPaV = parseFloat(document.getElementById('tasa_cesta_pa').value);
-      if(!f || isNaN(m)) return;
+      const tOf = parseFloat(document.getElementById('tasa_cesta_of').value), tPa = parseFloat(document.getElementById('tasa_cesta_pa').value);
+      if(!f || isNaN(m)) return alert("Datos incompletos");
       let nuevoPago = {fecha: f, monto_bs: m, tipo: t};
-      if(t === 'Cestaticket') { if(!isNaN(tOfV)) nuevoPago.tasa_sem_of = tOfV; if(!isNaN(tPaV)) nuevoPago.tasa_sem_pa = tPaV; }
+      if(t === 'Cestaticket') { if(!isNaN(tOf)) nuevoPago.tasa_sem_of = tOf; if(!isNaN(tPa)) nuevoPago.tasa_sem_pa = tPa; }
       semanas.push(nuevoPago); semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
-      localStorage.setItem('pagosSemanalesAlpla', JSON.stringify(semanas));
+      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+      document.getElementById('monto_bs').value = ""; document.getElementById('tasa_cesta_of').value = ""; document.getElementById('tasa_cesta_pa').value = "";
       actualizarInterfaz();
     }
 
-    function borrarReg(i) { if(confirm("¿Eliminar?")) { semanas.splice(i,1); localStorage.setItem('pagosSemanalesAlpla', JSON.stringify(semanas)); actualizarInterfaz(); } }
+    function borrarReg(i) { if(confirm("¿Eliminar registro?")) { semanas.splice(i,1); localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); actualizarInterfaz(); } }
 
     function renderizarTasas() {
       const div = document.getElementById('tasa-inputs');
@@ -419,48 +379,55 @@
 
     function guardarTasas() {
       for(let i=1; i<=12; i++) { tasasOf[i] = parseFloat(document.getElementById(`of-${i}`).value); tasasPar[i] = parseFloat(document.getElementById(`pa-${i}`).value); }
-      localStorage.setItem('tasasOficialesAlpla', JSON.stringify(tasasOf)); localStorage.setItem('tasasNegroAlpla', JSON.stringify(tasasPar));
-      alert("Tasas guardadas"); actualizarInterfaz();
+      localStorage.setItem('tasasOficiales', JSON.stringify(tasasOf)); localStorage.setItem('tasasParalelo', JSON.stringify(tasasPar));
+      alert("Tasas mensuales guardadas"); actualizarInterfaz();
     }
 
     function exportarTodo() {
-      let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;USD_BCV;USD_PAR\n";
-      for(let i=1; i<=12; i++) { csv += `TASA;${i};${tasasOf[i]};${tasasPar[i]};;;;\n`; }
-      semanas.forEach(s => {
-        const d = new Date(s.fecha + "T00:00:00"), m = d.getMonth() + 1;
-        const tOfV = (s.tipo === 'Cestaticket') ? s.tasa_sem_of : tasasOf[m];
-        const tPaV = (s.tipo === 'Cestaticket') ? s.tasa_sem_pa : tasasPar[m];
-        csv += `PAGO;${s.fecha};${s.tipo};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};${(s.monto_bs/tOfV).toFixed(2)};${(s.monto_bs/tPaV).toFixed(2)}\n`;
-      });
-      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement("a");
-      const fechaHoy = new Date().toISOString().split('T')[0];
-      link.setAttribute("href", url);
-      link.setAttribute("download", `Respaldo_MisPagos_${fechaHoy}.csv`);
-      link.click();
+      if (semanas.length === 0) return alert("No hay datos para exportar.");
+      if (confirm(`Vas a exportar un respaldo con ${semanas.length} registros. ¿Continuar?`)) {
+        let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;USD_BCV;USD_PAR\n";
+        for(let i=1; i<=12; i++) { csv += `TASA;${i};${tasasOf[i]};${tasasPar[i]};;;;\n`; }
+        semanas.forEach(s => {
+          const d = new Date(s.fecha + "T00:00:00"), m = d.getMonth() + 1;
+          const tOf = (s.tipo === 'Cestaticket' && s.tasa_sem_of) ? s.tasa_sem_of : tasasOf[m];
+          const tPa = (s.tipo === 'Cestaticket' && s.tasa_sem_pa) ? s.tasa_sem_pa : tasasPar[m];
+          csv += `PAGO;${s.fecha};${s.tipo||'Sueldo'};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};${(s.monto_bs/tOf).toFixed(2)};${(s.monto_bs/tPa).toFixed(2)}\n`;
+        });
+        const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement("a");
+        link.setAttribute("href", url);
+        link.setAttribute("download", `Respaldo_MisPagos_${new Date().toISOString().split('T')[0]}.csv`);
+        document.body.appendChild(link); link.click(); document.body.removeChild(link);
+      }
     }
 
     function importarTodo(input) {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        const lineas = e.target.result.replace(/^\uFEFF/, "").split(/\r?\n/);
-        let nP = [], nOf = {...tasasOf}, nPa = {...tasasPar};
-        lineas.forEach(l => {
-          const c = l.trim().split(';');
-          if(c[0] === "TASA") { nOf[parseInt(c[1])] = parseFloat(c[2]); nPa[parseInt(c[1])] = parseFloat(c[3]); }
-          else if(c[0] === "PAGO") { nP.push({ fecha: c[1], tipo: c[2], monto_bs: parseFloat(c[3]), tasa_sem_of: parseFloat(c[4])||null, tasa_sem_pa: parseFloat(c[5])||null }); }
-        });
-        semanas = nP; tasasOf = nOf; tasasPar = nPa;
-        localStorage.setItem('pagosSemanalesAlpla', JSON.stringify(semanas));
-        localStorage.setItem('tasasOficialesAlpla', JSON.stringify(tasasOf));
-        localStorage.setItem('tasasNegroAlpla', JSON.stringify(tasasPar));
-        location.reload();
-      };
-      reader.readAsText(input.files[0]);
+      if(!input.files[0]) return;
+      if(confirm("¡ATENCIÓN! Importar borrará todos los datos actuales de la app para cargar los del archivo. ¿Estás seguro?")) {
+        const reader = new FileReader();
+        reader.onload = (e) => {
+          const lineas = e.target.result.replace(/^\uFEFF/, "").split(/\r?\n/);
+          let nP = [], nOf = {...tasasOf}, nPa = {...tasasPar};
+          lineas.forEach(l => {
+            const c = l.trim().split(';');
+            if(c[0] === "TASA") { nOf[parseInt(c[1])] = parseFloat(c[2]); nPa[parseInt(c[1])] = parseFloat(c[3]); }
+            else if(c[0] === "PAGO") { nP.push({ fecha: c[1], tipo: c[2], monto_bs: parseFloat(c[3]), tasa_sem_of: parseFloat(c[4])||null, tasa_sem_pa: parseFloat(c[5])||null }); }
+          });
+          if(nP.length > 0) {
+            semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha)); tasasOf = nOf; tasasPar = nPa;
+            localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+            localStorage.setItem('tasasOficiales', JSON.stringify(tasasOf));
+            localStorage.setItem('tasasParalelo', JSON.stringify(tasasPar));
+            alert("Respaldo Cargado con éxito."); location.reload();
+          }
+        };
+        reader.readAsText(input.files[0]);
+      } else { input.value = ''; }
     }
 
-    function limpiarTodo() { if(confirm("¿Borrar todo?")) { localStorage.clear(); location.reload(); } }
+    function limpiarTodo() { if(confirm("¿Borrar todo permanentemente?")) { localStorage.clear(); location.reload(); } }
 
     document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
     actualizarInterfaz();
