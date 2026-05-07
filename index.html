@@ -1,0 +1,290 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, shrink-to-fit=no">
+  
+  <link rel="manifest" href="manifest.json">
+  <meta name="theme-color" content="#0f3460">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Mis Pagos">
+  <link rel="apple-touch-icon" href="icon.png">
+
+  <title>Mis pagos</title>
+  
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <style>
+    :root {
+      --primary: #0f3460;
+      --excel: #2e7d32;
+      --import: #0277bd;
+      --danger: #d32f2f;
+      --warning: #f39c12;
+      --vacaciones: #6a1b9a;
+      --cesta: #009688;
+      --anual: #1a1a2e;
+      --general: #455a64;
+      --bg: #f0f2f5;
+      --card-bg: #ffffff;
+      --text: #333333;
+      --text-secondary: #666666;
+      --border: #dddddd;
+      --radius: 15px;
+      --highlight: #2e7d32;
+    }
+
+    @media (prefers-color-scheme: dark) {
+      :root {
+        --bg: #121212;
+        --card-bg: #1e1e1e;
+        --text: #e0e0e0;
+        --text-secondary: #aaaaaa;
+        --border: #333333;
+        --primary: #4fc3f7;
+        --anual: #000000;
+        --general: #263238;
+        --highlight: #81c784;
+      }
+      input, select { background-color: #2c2c2c !important; color: white; border-color: #444 !important; }
+      th { background-color: #252525 !important; color: #4fc3f7 !important; }
+      td { border-bottom-color: #333 !important; color: #ddd; }
+      .stat-box { background: #1e1e1e !important; }
+      .acciones-btn { color: white !important; }
+    }
+
+    body { 
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+      margin: 0; 
+      padding: 10px; 
+      padding-bottom: env(safe-area-inset-bottom);
+      background: var(--bg); 
+      color: var(--text);
+      overscroll-behavior-y: contain;
+    }
+
+    .header-container { text-align: center; padding: 20px 0 10px 0; }
+    .header-container h1 { margin: 0; font-size: 1.6rem; color: var(--primary); font-weight: 800; }
+    .header-container span { display: block; font-size: 0.8rem; color: var(--text-secondary); }
+    
+    .card { background: var(--card-bg); padding: 15px; border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.15); margin-bottom: 15px; }
+    .resumen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
+    .stat-box { background: var(--card-bg); padding: 12px; border-radius: var(--radius); text-align: center; border-top: 4px solid var(--border); }
+    .full-width { grid-column: span 2; }
+    .stat-box .valor { font-size: 1.1rem; font-weight: bold; color: var(--primary); margin: 4px 0; }
+    
+    .border-sueldo { border-top-color: var(--primary); }
+    .border-util { border-top-color: var(--warning); }
+    .border-pres { border-top-color: var(--import); }
+    .border-vaca { border-top-color: var(--vacaciones); }
+    .border-cesta { border-top-color: var(--cesta); }
+
+    .comparativa-usd { display: flex; justify-content: center; gap: 8px; font-size: 0.8rem; font-weight: bold; }
+    .u-ofic { color: var(--import); }
+    .u-par { color: var(--danger); }
+
+    input, select { width: 100%; padding: 12px; font-size: 16px; border: 1px solid var(--border); border-radius: 10px; margin-bottom: 12px; box-sizing: border-box; }
+    button { width: 100%; padding: 14px; font-size: 1rem; font-weight: bold; border-radius: 10px; border: none; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 8px; }
+    .btn-main { background: var(--primary); color: white; }
+    
+    .table-container { overflow-x: auto; margin-top: 10px; }
+    table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
+    th { padding: 8px; text-align: left; color: var(--primary); }
+    td { padding: 8px; border-bottom: 1px solid var(--border); }
+    .monto-resaltado { color: var(--highlight); font-weight: 800 !important; }
+
+    .tag { font-size: 0.55rem; padding: 2px 5px; border-radius: 4px; color: white; font-weight: bold; text-transform: uppercase; }
+    .tag-sueldo { background: var(--primary); }
+    .tag-cestaticket { background: var(--cesta); }
+
+    .acciones-btn { background: rgba(128,128,128,0.1); width: 32px; height: 32px; border-radius: 6px; border: none; font-size: 0.9rem; }
+
+    /* Pantalla de Bloqueo */
+    #bloqueo-pantalla {
+      position: fixed; top: 0; left: 0; width: 100%; height: 100%;
+      background: var(--bg); z-index: 9999;
+      display: flex; flex-direction: column; justify-content: center; align-items: center;
+    }
+  </style>
+</head>
+<body>
+
+  <div id="bloqueo-pantalla">
+    <div style="font-size: 60px; margin-bottom: 20px;">👤</div>
+    <h2 style="color:var(--primary); margin-bottom: 30px;">App Bloqueada</h2>
+    <button class="btn-main" style="width: 220px;" onclick="autenticarUsuario()">
+      🔓 Desbloquear con Huella
+    </button>
+  </div>
+
+  <div class="header-container">
+    <h1>MIS PAGOS</h1>
+    <span>Control Financiero Personal</span>
+  </div>
+
+  <div class="resumen-grid">
+    <div class="stat-box full-width border-sueldo">
+      <h4>Sueldo Mes Actual</h4>
+      <div class="valor" id="suma-bs">0.00 Bs</div>
+      <div class="comparativa-usd">
+        <span class="u-ofic" id="sueldo-usd-of">0.00 $ BCV</span>
+        <span class="u-par" id="sueldo-usd-pa">0.00 $ Par.</span>
+      </div>
+    </div>
+    <div class="stat-box border-util">
+      <h4>Utilidades</h4>
+      <div class="valor" id="total-util">0.00 Bs</div>
+    </div>
+    <div class="stat-box border-pres">
+      <h4>Prestaciones</h4>
+      <div class="valor" id="total-pres">0.00 Bs</div>
+    </div>
+    <div class="stat-box border-cesta">
+      <h4>Cesta Ticket</h4>
+      <div class="valor" id="total-cest">0.00 Bs</div>
+    </div>
+    <div class="stat-box border-vaca">
+      <h4>Vacaciones</h4>
+      <div class="valor" id="total-vaca">0.00 Bs</div>
+    </div>
+    <div class="stat-box full-width" style="background: var(--general); color:white; border:none;">
+      <h4 style="color: #cfd8dc;">💎 TOTAL GENERAL</h4>
+      <div class="valor" style="color:#81d4fa;" id="general-total-bs">0.00 Bs</div>
+    </div>
+  </div>
+
+  <div class="card">
+    <label>📅 Fecha</label>
+    <input type="date" id="fecha">
+    <label>📂 Tipo</label>
+    <select id="tipo_ingreso" onchange="verificarTipo()">
+      <option value="Sueldo">Sueldo Semanal</option>
+      <option value="Cestaticket">Cesta Ticket</option>
+      <option value="Utilidades">Utilidades</option>
+      <option value="Prestaciones">Prestaciones</option>
+      <option value="Vacaciones">Vacaciones</option>
+    </select>
+    <div id="cesta-tasas" style="display:none; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px;">
+      <input type="number" id="tasa_cesta_of" placeholder="Tasa BCV" step="0.01">
+      <input type="number" id="tasa_cesta_pa" placeholder="Tasa Par." step="0.01">
+    </div>
+    <input type="number" id="monto_bs" placeholder="Monto Bs" step="0.01">
+    <button class="btn-main" onclick="agregarSemana()">Registrar Pago</button>
+  </div>
+
+  <div class="card">
+    <canvas id="graficoMensual" style="height: 200px;"></canvas>
+  </div>
+
+  <details class="card" open>
+    <summary>📋 Historial</summary>
+    <div class="table-container">
+      <table>
+        <thead>
+          <tr><th>Fecha</th><th>Tipo</th><th>Bs</th><th>Acción</th></tr>
+        </thead>
+        <tbody id="tabla-body"></tbody>
+      </table>
+    </div>
+    <button style="background:var(--excel); color:white; margin-top:15px;" onclick="exportarTodo()">⬇️ Exportar CSV</button>
+    <input type="file" id="file-input" style="display:none;" onchange="importarTodo(this)">
+    <button style="background:var(--import); color:white; margin-top:10px;" onclick="document.getElementById('file-input').click()">📂 Importar</button>
+  </details>
+
+  <script>
+    // LÓGICA DE HUELLA
+    async function autenticarUsuario() {
+      if (window.PublicKeyCredential) {
+        try {
+          // Nota: Requiere HTTPS (GitHub Pages) para activarse
+          const credential = await navigator.credentials.get({
+            publicKey: {
+              challenge: new Uint8Array([1, 2, 3, 4]),
+              allowCredentials: [],
+              userVerification: "required"
+            }
+          });
+          if (credential) document.getElementById('bloqueo-pantalla').style.display = 'none';
+        } catch (e) {
+          alert("Error de huella. Asegúrate de estar usando HTTPS.");
+          document.getElementById('bloqueo-pantalla').style.display = 'none'; // Fallback
+        }
+      } else {
+        document.getElementById('bloqueo-pantalla').style.display = 'none';
+      }
+    }
+
+    // LÓGICA DE DATOS
+    let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
+    let tasasOf = JSON.parse(localStorage.getItem('tasasOficiales')) || {1:40,2:42,3:45,4:48,5:48,6:48,7:48,8:48,9:48,10:48,11:48,12:48};
+    let tasasPar = JSON.parse(localStorage.getItem('tasasNegro')) || {1:48,2:51,3:55,4:60,5:60,6:60,7:60,8:60,9:60,10:60,11:60,12:60};
+
+    function formatear(n) { return new Intl.NumberFormat('es-VE').format(n); }
+
+    function verificarTipo() {
+      const t = document.getElementById('tipo_ingreso').value;
+      document.getElementById('cesta-tasas').style.display = (t === 'Cestaticket') ? 'grid' : 'none';
+    }
+
+    function actualizarInterfaz() {
+      const montosSueldo = semanas.filter(s => s.tipo === 'Sueldo' || !s.tipo).map(s => s.monto_bs);
+      const promedio = montosSueldo.length > 0 ? montosSueldo.reduce((a,b)=>a+b,0)/montosSueldo.length : 0;
+
+      const tbody = document.getElementById('tabla-body');
+      tbody.innerHTML = semanas.slice().reverse().map((s, i) => {
+        const idx = semanas.length - 1 - i;
+        const resaltado = ((s.tipo === 'Sueldo' || !s.tipo) && s.monto_bs > promedio) ? 'monto-resaltado' : '';
+        return `<tr>
+          <td>${s.fecha}</td>
+          <td><span class="tag tag-${(s.tipo || 'sueldo').toLowerCase()}">${s.tipo || 'Sueldo'}</span></td>
+          <td class="${resaltado}">${formatear(s.monto_bs)}</td>
+          <td><button class="acciones-btn" onclick="borrarReg(${idx})">✖</button></td>
+        </tr>`;
+      }).join('');
+
+      // Cálculos rápidos para el resumen
+      document.getElementById('suma-bs').textContent = formatear(semanas.filter(s=>s.tipo==='Sueldo').reduce((a,b)=>a+b.monto_bs,0).toFixed(2)) + " Bs";
+      document.getElementById('general-total-bs').textContent = formatear(semanas.reduce((a,b)=>a+b.monto_bs,0).toFixed(2)) + " Bs";
+    }
+
+    function agregarSemana() {
+      const f = document.getElementById('fecha').value, m = parseFloat(document.getElementById('monto_bs').value), t = document.getElementById('tipo_ingreso').value;
+      if(!f || isNaN(m)) return alert("Faltan datos");
+      semanas.push({fecha: f, monto_bs: m, tipo: t});
+      semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
+      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+      actualizarInterfaz();
+    }
+
+    function borrarReg(i) { if(confirm("¿Eliminar?")) { semanas.splice(i,1); localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); actualizarInterfaz(); } }
+
+    function exportarTodo() {
+      let csv = "\uFEFFPAGO;FECHA;TIPO;MONTO\n";
+      semanas.forEach(s => csv += `PAGO;${s.fecha};${s.tipo};${s.monto_bs}\n`);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url; a.download = "respaldo.csv"; a.click();
+    }
+
+    function importarTodo(input) {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        const lineas = e.target.result.split('\n');
+        let nP = [];
+        lineas.forEach(l => {
+          const c = l.split(';');
+          if(c[0] === 'PAGO') nP.push({fecha: c[1], tipo: c[2], monto_bs: parseFloat(c[3])});
+        });
+        semanas = nP; localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+        location.reload();
+      };
+      reader.readAsText(input.files[0]);
+    }
+
+    document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+    actualizarInterfaz();
+  </script>
+</body>
+</html>
