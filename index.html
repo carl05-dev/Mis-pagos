@@ -98,9 +98,17 @@
       touch-action: manipulation;
     }
     .btn-main { background: var(--primary); color: white; }
-    
-    .chart-container { height: 250px; width: 100%; margin-top: 10px; }
 
+    /* ESTILOS DE LA BARRA DE META */
+    .meta-card { background: #fff; border-left: 5px solid var(--excel); margin-top: 5px; }
+    .meta-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
+    .meta-monto { font-weight: 800; color: var(--excel); font-size: 1.2rem; margin-bottom: 10px; }
+    .meta-edit { background: var(--excel); color: white; padding: 5px 12px; border-radius: 8px; font-size: 0.7rem; font-weight: bold; cursor: pointer; }
+    .progress-bg { background: #e0e0e0; height: 12px; border-radius: 10px; overflow: hidden; }
+    .progress-fill { background: var(--excel); height: 100%; width: 0%; transition: width 0.5s; }
+    .meta-footer { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: #666; font-weight: bold; }
+
+    .chart-container { height: 250px; width: 100%; margin-top: 10px; }
     .table-container { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
     th { background: #f4f6f8; padding: 8px; text-align: left; white-space: nowrap; }
@@ -117,14 +125,8 @@
 
     summary { font-weight: bold; color: var(--primary); cursor: pointer; padding: 5px 0; }
     
-    .tasa-grid { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 8px; text-align: center; align-items: center; }
-    .tasa-header { font-weight: bold; font-size: 0.8rem; color: var(--primary); margin-bottom: 5px; }
-    .mes-label { font-size: 0.85rem; font-weight: bold; color: #555; }
-    .tasa-input { margin-bottom: 0 !important; font-size: 14px !important; padding: 8px; }
+    .tasas-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 
-    .cesta-tasas-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; display: none; margin-bottom: 10px; }
-
-    /* ESTILOS DEL MODAL PERSONALIZADO */
     .modal-overlay {
       position: fixed;
       top: 0; left: 0; width: 100%; height: 100%;
@@ -207,13 +209,29 @@
         <span style="color: #ffcc80; margin-left: 10px;" id="general-usd-pa">0.00 $ Par.</span>
       </div>
     </div>
+
+    <div class="card full-width meta-card">
+      <div class="meta-header">
+        <label style="margin:0; font-size: 0.8rem; color: #555;">🎯 META DE AHORRO PERSONAL</label>
+        <div class="meta-edit" onclick="editarMetaManual()">GESTIONAR</div>
+      </div>
+      <div class="meta-monto" id="meta-display">0.00 $ / 0.00 $</div>
+      <div class="progress-bg">
+        <div class="progress-fill" id="meta-progreso"></div>
+      </div>
+      <div class="meta-footer">
+        <span id="meta-porcentaje">0% de la meta</span>
+        <span id="meta-restante" style="color: var(--excel);">Faltan: 0$</span>
+      </div>
+    </div>
   </div>
 
   <div class="card">
     <label>📅 Fecha de Pago</label>
     <input type="date" id="fecha">
+    
     <label>📂 Categoría</label>
-    <select id="tipo_ingreso" onchange="verificarTipo()">
+    <select id="tipo_ingreso">
       <option value="Sueldo">Sueldo Semanal</option>
       <option value="Cestaticket">Cesta Ticket</option>
       <option value="Utilidades">Utilidades</option>
@@ -221,13 +239,14 @@
       <option value="Vacaciones">Vacaciones</option>
     </select>
     
-    <div id="cesta-tasas" class="cesta-tasas-row">
-      <div><label>💵 Tasa BCV</label><input type="number" id="tasa_cesta_of" inputmode="decimal" placeholder="0.00" step="0.01"></div>
-      <div><label>🔥 Tasa Par.</label><input type="number" id="tasa_cesta_pa" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+    <div id="registro-tasas" class="tasas-row">
+      <div><label>💵 Tasa BCV</label><input type="number" id="tasa_registro_of" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+      <div><label>🔥 Tasa Par.</label><input type="number" id="tasa_registro_pa" inputmode="decimal" placeholder="0.00" step="0.01"></div>
     </div>
 
     <label>💰 Monto en Bolívares</label>
     <input type="number" id="monto_bs" inputmode="decimal" placeholder="0.00" step="0.01">
+    
     <button class="btn-main" onclick="agregarSemana()">Registrar Pago</button>
   </div>
 
@@ -235,12 +254,6 @@
     <summary style="list-style: none;">📈 Histórico Mensual</summary>
     <div class="chart-container"><canvas id="graficoMensual"></canvas></div>
   </div>
-
-  <details class="card">
-    <summary>⚙️ Ajustar Tasas Mensuales</summary>
-    <div id="tasa-inputs" class="tasa-grid" style="margin-top:15px;"></div>
-    <button class="btn-main" style="margin-top:20px;" onclick="guardarTasas()">Guardar Tasas</button>
-  </details>
 
   <details class="card" open>
     <summary>📋 Historial de Pagos y Respaldo</summary>
@@ -275,10 +288,11 @@
     
     let chartInstance = null;
     let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
-    let tasasOf = JSON.parse(localStorage.getItem('tasasOficiales')) || {1:40,2:42,3:45,4:48,5:48,6:48,7:48,8:48,9:48,10:48,11:48,12:48};
-    let tasasPar = JSON.parse(localStorage.getItem('tasasParalelo')) || {1:48,2:51,3:55,4:60,5:60,6:60,7:60,8:60,9:60,10:60,11:60,12:60};
+    
+    // VARIABLES DE META
+    let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
+    let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
-    // LOGICA DEL MODAL (CORREGIDA)
     let currentCallback = null;
     function customPrompt(mensaje, valorDefecto, tipo, callback) {
       document.getElementById('modal-message').innerText = mensaje;
@@ -295,9 +309,9 @@
 
     function confirmModal() {
       const val = document.getElementById('modal-input').value;
-      const callbackARecordar = currentCallback; // Guardamos el callback antes de limpiar
+      const callbackARecordar = currentCallback;
       closeModal();
-      if (callbackARecordar) callbackARecordar(val); // Ejecutamos el guardado
+      if (callbackARecordar) callbackARecordar(val);
     }
 
     function closeModal() { 
@@ -307,9 +321,23 @@
 
     function formatear(n) { return new Intl.NumberFormat('es-VE').format(n); }
 
-    function verificarTipo() {
-      const tipo = document.getElementById('tipo_ingreso').value;
-      document.getElementById('cesta-tasas').style.display = (tipo === 'Cestaticket') ? 'grid' : 'none';
+    // GESTIÓN DE META
+    function editarMetaManual() {
+      customPrompt("¿Cuánto has recaudado hasta hoy ($)?", ahorroRecaudado, "number", (montoRec) => {
+        const rec = parseFloat(montoRec);
+        if(!isNaN(rec)) {
+          ahorroRecaudado = rec;
+          localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+          customPrompt("¿Cuál es tu meta final ($)?", metaAhorro, "number", (montoMeta) => {
+            const met = parseFloat(montoMeta);
+            if(!isNaN(met) && met >= 0) {
+              metaAhorro = met;
+              localStorage.setItem('metaAhorro', metaAhorro);
+              actualizarInterfaz();
+            }
+          });
+        }
+      });
     }
 
     function actualizarInterfaz() {
@@ -323,10 +351,11 @@
       });
 
       const calcTotal = (lista) => lista.reduce((a, b) => a + b.monto_bs, 0);
+      
+      // El cálculo en USD ahora siempre usa la tasa registrada con el pago
+      // (Se usa || 1 por si en el futuro se importan datos viejos sin tasas, para evitar errores matemáticos)
       const calcUSD = (lista, tipoTasa = 'of') => lista.reduce((acc, s) => {
-        const d = new Date(s.fecha + "T00:00:00");
-        const m = d.getMonth() + 1;
-        let tF = (s.tipo === 'Cestaticket') ? (tipoTasa === 'of' ? s.tasa_sem_of : s.tasa_sem_pa) : (tipoTasa === 'of' ? tasasOf[m] : tasasPar[m]);
+        let tF = tipoTasa === 'of' ? s.tasa_sem_of : s.tasa_sem_pa;
         return acc + (s.monto_bs / (tF || 1));
       }, 0);
 
@@ -352,13 +381,24 @@
       document.getElementById('general-usd-of').textContent = formatear(calcUSD(semanas, 'of').toFixed(2)) + " $ BCV";
       document.getElementById('general-usd-pa').textContent = formatear(calcUSD(semanas, 'pa').toFixed(2)) + " $ Par.";
 
+      // ACTUALIZAR BARRA DE META
+      let porcentaje = 0;
+      if(metaAhorro > 0) porcentaje = Math.min((ahorroRecaudado / metaAhorro) * 100, 100);
+      document.getElementById('meta-display').textContent = `${formatear(ahorroRecaudado)} $ / ${formatear(metaAhorro)} $`;
+      document.getElementById('meta-progreso').style.width = porcentaje + "%";
+      document.getElementById('meta-porcentaje').textContent = `${porcentaje.toFixed(1)}% de la meta`;
+      const faltante = Math.max(metaAhorro - ahorroRecaudado, 0);
+      document.getElementById('meta-restante').textContent = `Faltan: ${formatear(faltante.toFixed(2))} $`;
+
       const tbody = document.getElementById('tabla-body');
       tbody.innerHTML = semanas.slice().reverse().map((s, i) => {
         const idx = semanas.length - 1 - i;
         const d = new Date(s.fecha + "T00:00:00");
-        const m = d.getMonth() + 1;
-        const tOf = (s.tipo === 'Cestaticket' && s.tasa_sem_of) ? s.tasa_sem_of : tasasOf[m];
-        const tPa = (s.tipo === 'Cestaticket' && s.tasa_sem_pa) ? s.tasa_sem_pa : tasasPar[m];
+        
+        // Asignamos las tasas guardadas o 1 por si es un registro legacy defectuoso
+        const tOf = s.tasa_sem_of || 1;
+        const tPa = s.tasa_sem_pa || 1;
+
         return `<tr><td><strong>${NOMBRES_DIAS[d.getDay()]}</strong><br>${s.fecha.split('-').reverse().slice(0,2).join('/')}</td>
           <td><span class="tag tag-${(s.tipo || 'Sueldo').toLowerCase()}">${s.tipo || 'Sueldo'}</span></td>
           <td style="font-weight:bold;">${formatear(s.monto_bs)}</td>
@@ -367,11 +407,10 @@
           <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idx})">✏️</button>
           <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idx})">✖</button></div></td></tr>`;
       }).join('');
+      
       actualizarGrafico();
-      renderizarTasas();
     }
 
-    // EDICIÓN SECUENCIAL RESTAURADA
     function editarReg(i) {
       customPrompt("Editar Fecha:", semanas[i].fecha, "date", (nf) => {
         if (!nf) return;
@@ -379,28 +418,21 @@
           const montoNum = parseFloat(nm);
           if (isNaN(montoNum)) return;
           
-          semanas[i].fecha = nf;
-          semanas[i].monto_bs = montoNum;
-          
-          if (semanas[i].tipo === 'Cestaticket') {
-            customPrompt("Editar Tasa BCV:", semanas[i].tasa_sem_of || "", "number", (ntOf) => {
-              customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
-                if (!isNaN(parseFloat(ntOf))) semanas[i].tasa_sem_of = parseFloat(ntOf);
-                if (!isNaN(parseFloat(ntPa))) semanas[i].tasa_sem_pa = parseFloat(ntPa);
-                guardarCambios();
-              });
+          customPrompt("Editar Tasa BCV:", semanas[i].tasa_sem_of || "", "number", (ntOf) => {
+            customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
+              
+              semanas[i].fecha = nf;
+              semanas[i].monto_bs = montoNum;
+              if (!isNaN(parseFloat(ntOf))) semanas[i].tasa_sem_of = parseFloat(ntOf);
+              if (!isNaN(parseFloat(ntPa))) semanas[i].tasa_sem_pa = parseFloat(ntPa);
+              
+              semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
+              localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+              actualizarInterfaz();
             });
-          } else {
-            guardarCambios();
-          }
+          });
         });
       });
-
-      function guardarCambios() {
-        semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
-        localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-        actualizarInterfaz();
-      }
     }
 
     function actualizarGrafico() {
@@ -408,7 +440,12 @@
       const sueldosOnly = semanas.filter(s => s.tipo === 'Sueldo' || !s.tipo);
       const mesesConDatos = [...new Set(sueldosOnly.map(s => new Date(s.fecha + "T00:00:00").getMonth()))].sort((a,b)=>a-b);
       const mIndices = mesesConDatos.length > 0 ? mesesConDatos : [new Date().getMonth()];
-      const getVal = (m, t) => sueldosOnly.filter(s => new Date(s.fecha + "T00:00:00").getMonth() === m).reduce((acc, s) => acc + (s.monto_bs / (t === 'of' ? tasasOf[m+1] : tasasPar[m+1])), 0);
+      
+      // La gráfica ahora utiliza la tasa guardada en cada registro de sueldo para ser precisa
+      const getVal = (m, t) => sueldosOnly
+        .filter(s => new Date(s.fecha + "T00:00:00").getMonth() === m)
+        .reduce((acc, s) => acc + (s.monto_bs / (t === 'of' ? (s.tasa_sem_of || 1) : (s.tasa_sem_pa || 1))), 0);
+      
       if(chartInstance) chartInstance.destroy();
       chartInstance = new Chart(ctx, {
         type: 'bar',
@@ -421,34 +458,44 @@
     }
 
     function agregarSemana() {
-      const f = document.getElementById('fecha').value, m = parseFloat(document.getElementById('monto_bs').value), t = document.getElementById('tipo_ingreso').value;
-      const tOf = parseFloat(document.getElementById('tasa_cesta_of').value), tPa = parseFloat(document.getElementById('tasa_cesta_pa').value);
-      if(!f || isNaN(m)) return customPrompt("Ingresa fecha y monto", "", "alert");
-      let nuevo = {fecha: f, monto_bs: m, tipo: t};
-      if(t === 'Cestaticket') { if(!isNaN(tOf)) nuevo.tasa_sem_of = tOf; if(!isNaN(tPa)) nuevo.tasa_sem_pa = tPa; }
-      semanas.push(nuevo); semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
+      const f = document.getElementById('fecha').value;
+      const m = parseFloat(document.getElementById('monto_bs').value);
+      const t = document.getElementById('tipo_ingreso').value;
+      const tOf = parseFloat(document.getElementById('tasa_registro_of').value);
+      const tPa = parseFloat(document.getElementById('tasa_registro_pa').value);
+      
+      // Ahora es obligatorio colocar ambas tasas para cualquier registro
+      if(!f || isNaN(m) || isNaN(tOf) || isNaN(tPa)) {
+        return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
+      }
+      
+      let nuevo = {
+        fecha: f, 
+        monto_bs: m, 
+        tipo: t,
+        tasa_sem_of: tOf,
+        tasa_sem_pa: tPa
+      };
+      
+      semanas.push(nuevo); 
+      semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
       localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-      document.getElementById('monto_bs').value = ""; document.getElementById('tasa_cesta_of').value = ""; document.getElementById('tasa_cesta_pa').value = "";
+      
+      document.getElementById('monto_bs').value = ""; 
+      document.getElementById('tasa_registro_of').value = ""; 
+      document.getElementById('tasa_registro_pa').value = "";
+      
       actualizarInterfaz();
     }
 
-    function borrarReg(i) { customPrompt("¿Eliminar registro?", "", "confirm", (c) => { if(c){semanas.splice(i,1); localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); actualizarInterfaz();} }); }
-
-    function renderizarTasas() {
-      const div = document.getElementById('tasa-inputs');
-      if(div.innerHTML !== "") return;
-      div.innerHTML = `<div class="tasa-header">Mes</div><div class="tasa-header">BCV</div><div class="tasa-header">Par</div>`;
-      for(let i=1; i<=12; i++) {
-        div.innerHTML += `<div class="mes-label">${NOMBRES_MESES[i-1]}</div>
-        <input type="number" id="of-${i}" value="${tasasOf[i]}" class="tasa-input" inputmode="decimal" step="0.01">
-        <input type="number" id="pa-${i}" value="${tasasPar[i]}" class="tasa-input" inputmode="decimal" step="0.01">`;
-      }
-    }
-
-    function guardarTasas() {
-      for(let i=1; i<=12; i++) { tasasOf[i] = parseFloat(document.getElementById(`of-${i}`).value); tasasPar[i] = parseFloat(document.getElementById(`pa-${i}`).value); }
-      localStorage.setItem('tasasOficiales', JSON.stringify(tasasOf)); localStorage.setItem('tasasParalelo', JSON.stringify(tasasPar));
-      customPrompt("Tasas guardadas", "", "alert", () => actualizarInterfaz());
+    function borrarReg(i) { 
+      customPrompt("¿Eliminar registro?", "", "confirm", (c) => { 
+        if(c){
+          semanas.splice(i,1); 
+          localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); 
+          actualizarInterfaz();
+        } 
+      }); 
     }
 
     function exportarTodo() {
@@ -456,13 +503,17 @@
       customPrompt(`Exportar ${semanas.length} registros. ¿Continuar?`, "", "confirm", (c) => {
         if(!c) return;
         let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;USD_BCV;USD_PAR\n";
-        for(let i=1; i<=12; i++) { csv += `TASA;${i};${tasasOf[i]};${tasasPar[i]};;;;\n`; }
+        
+        // Exportar Meta y Recaudado
+        csv += `META;${metaAhorro};${ahorroRecaudado};;;;;\n`;
+        
+        // Exportar pagos con sus tasas incrustadas
         semanas.forEach(s => {
-          const m = new Date(s.fecha + "T00:00:00").getMonth() + 1;
-          const tOf = (s.tipo === 'Cestaticket' && s.tasa_sem_of) ? s.tasa_sem_of : tasasOf[m];
-          const tPa = (s.tipo === 'Cestaticket' && s.tasa_sem_pa) ? s.tasa_sem_pa : tasasPar[m];
+          const tOf = s.tasa_sem_of || 1;
+          const tPa = s.tasa_sem_pa || 1;
           csv += `PAGO;${s.fecha};${s.tipo||'Sueldo'};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};${(s.monto_bs/tOf).toFixed(2)};${(s.monto_bs/tPa).toFixed(2)}\n`;
         });
+        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -478,17 +529,33 @@
         const reader = new FileReader();
         reader.onload = (e) => {
           const lineas = e.target.result.replace(/^\uFEFF/, "").split(/\r?\n/);
-          let nP = [], nOf = {...tasasOf}, nPa = {...tasasPar};
+          let nP = [];
+          
           lineas.forEach(l => {
             const c = l.trim().split(';');
-            if(c[0] === "TASA") { nOf[parseInt(c[1])] = parseFloat(c[2]); nPa[parseInt(c[1])] = parseFloat(c[3]); }
-            else if(c[0] === "PAGO") { nP.push({ fecha: c[1], tipo: c[2], monto_bs: parseFloat(c[3]), tasa_sem_of: parseFloat(c[4])||null, tasa_sem_pa: parseFloat(c[5])||null }); }
+            if(c[0] === "META") { 
+               metaAhorro = parseFloat(c[1]); 
+               ahorroRecaudado = parseFloat(c[2]);
+               localStorage.setItem('metaAhorro', metaAhorro);
+               localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+            }
+            else if(c[0] === "PAGO") { 
+               nP.push({ 
+                 fecha: c[1], 
+                 tipo: c[2], 
+                 monto_bs: parseFloat(c[3]), 
+                 tasa_sem_of: parseFloat(c[4]) || null, 
+                 tasa_sem_pa: parseFloat(c[5]) || null 
+               }); 
+            }
           });
+          
           if(nP.length > 0) {
-            semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha)); tasasOf = nOf; tasasPar = nPa;
+            semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha));
             localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-            localStorage.setItem('tasasOficiales', JSON.stringify(tasasOf));
-            localStorage.setItem('tasasParalelo', JSON.stringify(tasasPar));
+            // Como ya no se usan tasas mensuales generales, limpiamos ese localStorage si existe
+            localStorage.removeItem('tasasOficiales');
+            localStorage.removeItem('tasasParalelo');
             location.reload();
           }
         };
@@ -496,7 +563,14 @@
       });
     }
 
-    function limpiarTodo() { customPrompt("¿BORRAR TODO permanentemente?", "", "confirm", (c) => { if(c){localStorage.clear(); location.reload();} }); }
+    function limpiarTodo() { 
+      customPrompt("¿BORRAR TODO permanentemente?", "", "confirm", (c) => { 
+        if(c){
+          localStorage.clear(); 
+          location.reload();
+        } 
+      }); 
+    }
 
     document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
     actualizarInterfaz();
