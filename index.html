@@ -262,6 +262,14 @@
 
   <details class="card" open>
     <summary>📋 Historial de Pagos y Respaldo</summary>
+    
+    <!-- NUEVO: FILTRO POR FECHA -->
+    <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+      <div><label>Desde:</label><input type="date" id="filtro-desde" onchange="actualizarInterfaz()"></div>
+      <div><label>Hasta:</label><input type="date" id="filtro-hasta" onchange="actualizarInterfaz()"></div>
+    </div>
+    <button style="background: var(--general); font-size: 0.7rem; padding: 8px; margin-bottom: 10px;" onclick="limpiarFiltros()">Limpiar Filtros</button>
+
     <div class="table-container">
       <table>
         <thead>
@@ -390,9 +398,22 @@
       const faltante = Math.max(metaAhorro - ahorroRecaudado, 0);
       document.getElementById('meta-restante').textContent = `Faltan: ${formatear(faltante.toFixed(2))} $`;
 
+      // LÓGICA DE FILTRADO PARA LA TABLA
+      const desde = document.getElementById('filtro-desde').value;
+      const hasta = document.getElementById('filtro-hasta').value;
+      let semanasFiltradas = [...semanas];
+
+      if (desde || hasta) {
+        semanasFiltradas = semanas.filter(s => {
+          if (desde && s.fecha < desde) return false;
+          if (hasta && s.fecha > hasta) return false;
+          return true;
+        });
+      }
+
       const tbody = document.getElementById('tabla-body');
-      tbody.innerHTML = semanas.slice().reverse().map((s, i) => {
-        const idx = semanas.length - 1 - i;
+      tbody.innerHTML = semanasFiltradas.slice().reverse().map((s) => {
+        const idxOriginal = semanas.indexOf(s); // Referencia correcta al array original
         const d = new Date(s.fecha + "T00:00:00");
         const tOf = s.tasa_sem_of || 1;
         const tPa = s.tasa_sem_pa || 1;
@@ -402,8 +423,8 @@
           <td style="font-weight:bold;">${formatear(s.monto_bs)}</td>
           <td style="color:var(--import); font-weight:500;">${(s.monto_bs / tOf).toFixed(2)}$</td>
           <td style="color:var(--danger); font-weight:500;">${(s.monto_bs / tPa).toFixed(2)}$</td>
-          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idx})">✏️</button>
-          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idx})">✖</button></div></td></tr>`;
+          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idxOriginal})">✏️</button>
+          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idxOriginal})">✖</button></div></td></tr>`;
       }).join('');
       
       actualizarGrafico();
@@ -478,19 +499,17 @@
       document.getElementById('tasa_registro_of').value = ""; 
       document.getElementById('tasa_registro_pa').value = "";
       
-      // FEEDBACK INMEDIATO CON TOASTIFY
       Toastify({
         text: `✅ ${t} registrado correctamente`,
         duration: 3000,
-        gravity: "top", // top or bottom
-        position: "center", // left, center or right
-        stopOnFocus: true, // Prevents dismissing of toast on hover
+        gravity: "top",
+        position: "center",
+        stopOnFocus: true,
         style: {
           background: "linear-gradient(to right, #0f3460, #2e7d32)",
           borderRadius: "10px",
           fontWeight: "bold"
-        },
-        onClick: function(){} // Callback after click
+        }
       }).showToast();
 
       actualizarInterfaz();
@@ -504,6 +523,12 @@
           actualizarInterfaz();
         } 
       }); 
+    }
+
+    function limpiarFiltros() {
+      document.getElementById('filtro-desde').value = "";
+      document.getElementById('filtro-hasta').value = "";
+      actualizarInterfaz();
     }
 
     function exportarTodo() {
@@ -554,8 +579,6 @@
           if(nP.length > 0) {
             semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha));
             localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-            localStorage.removeItem('tasasOficiales');
-            localStorage.removeItem('tasasParalelo');
             location.reload();
           }
         };
