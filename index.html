@@ -319,7 +319,7 @@
       currentCallback = callback;
     }
 
-        function confirmModal() {
+    function confirmModal() {
       const input = document.getElementById('modal-input');
       
       // Si el input está oculto (porque es una alerta o confirmación), enviamos 'true'.
@@ -477,6 +477,67 @@
       });
     }
 
+    function autocompletarTasaMensual() {
+      const fechaSeleccionada = document.getElementById('fecha').value;
+      if (!fechaSeleccionada) return;
+
+      const añoMes = fechaSeleccionada.substring(0, 7); // Obtiene "YYYY-MM"
+      const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
+      const inputBCV = document.getElementById('tasa_registro_of');
+      
+      if (tasaGuardada) {
+        inputBCV.value = tasaGuardada;
+        inputBCV.style.backgroundColor = "#e8f0fe"; 
+      } else {
+        inputBCV.value = "";
+        inputBCV.style.backgroundColor = "white";
+      }
+    }
+
+    // NUEVA FUNCIÓN: Busca la tasa paralelo automáticamente para cualquier categoría
+    function manejarCambioCategoria() {
+      const inputParalelo = document.getElementById('tasa_registro_pa');
+
+      // Si ya tiene una tasa escrita o cargada, evitamos pisarla
+      if (inputParalelo.value !== "") return;
+
+      inputParalelo.placeholder = "Cargando...";
+      inputParalelo.style.backgroundColor = "#fff9c4"; // Fondo amarillo de carga
+
+      fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.promedio) {
+            const tasaParalelo = parseFloat(data.promedio);
+            if (!isNaN(tasaParalelo)) {
+              inputParalelo.value = tasaParalelo.toFixed(2);
+              inputParalelo.style.backgroundColor = "#ffebee"; // Color rojo sutil para paralelo
+              
+              Toastify({
+                text: `🔥 Tasa Paralelo actualizada: ${tasaParalelo.toFixed(2)} Bs`,
+                duration: 2500,
+                gravity: "top",
+                position: "center",
+                style: { background: "#d32f2f", borderRadius: "10px", fontWeight: "bold" }
+              }).showToast();
+            }
+          }
+        })
+        .catch(error => {
+          console.error("Error al consultar la API:", error);
+          inputParalelo.placeholder = "0.00";
+          inputParalelo.style.backgroundColor = "white";
+          
+          Toastify({
+            text: "⚠️ No se pudo cargar la tasa paralelo automáticamente. Ingrésala manual.",
+            duration: 3500,
+            gravity: "top",
+            position: "center",
+            style: { background: "#f39c12", borderRadius: "10px", fontWeight: "bold" }
+          }).showToast();
+        });
+    }
+
     function agregarSemana() {
       const f = document.getElementById('fecha').value;
       const m = parseFloat(document.getElementById('monto_bs').value);
@@ -499,6 +560,10 @@
       semanas.push(nuevo); 
       semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
       localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+
+      // GUARDAR LA TASA BCV DEL MES ACTUAL
+      const añoMes = f.substring(0, 7);
+      localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
       
       document.getElementById('monto_bs').value = ""; 
       document.getElementById('tasa_registro_of').value = ""; 
@@ -517,6 +582,8 @@
         }
       }).showToast();
 
+      autocompletarTasaMensual();
+      manejarCambioCategoria(); // Re-invoca la tasa para el siguiente registro
       actualizarInterfaz();
     }
 
@@ -600,7 +667,16 @@
       }); 
     }
 
+    // Configuración Inicial de carga de página
     document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
+    document.getElementById('fecha').addEventListener('change', autocompletarTasaMensual);
+    
+    // Escucha activamente el cambio de cualquier categoría
+    document.getElementById('tipo_ingreso').addEventListener('change', manejarCambioCategoria);
+    
+    // Arranque inicial de la app
+    autocompletarTasaMensual();
+    manejarCambioCategoria(); // Carga la tasa paralelo inmediatamente al abrir la app
     actualizarInterfaz();
   </script>
 </body>
