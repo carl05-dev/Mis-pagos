@@ -17,7 +17,12 @@
 
   <title>Mis pagos</title>
   
+  <!-- Librerías Externas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+  <!-- Toastify CSS & JS -->
+  <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
+  <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
+
   <style>
     :root {
       --primary: #0f3460;
@@ -257,6 +262,14 @@
 
   <details class="card" open>
     <summary>📋 Historial de Pagos y Respaldo</summary>
+    
+    <!-- NUEVO: FILTRO POR FECHA -->
+    <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+      <div><label>Desde:</label><input type="date" id="filtro-desde" onchange="actualizarInterfaz()"></div>
+      <div><label>Hasta:</label><input type="date" id="filtro-hasta" onchange="actualizarInterfaz()"></div>
+    </div>
+    <button style="background: var(--general); font-size: 0.7rem; padding: 8px; margin-bottom: 10px;" onclick="limpiarFiltros()">Limpiar Filtros</button>
+
     <div class="table-container">
       <table>
         <thead>
@@ -289,7 +302,6 @@
     let chartInstance = null;
     let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
     
-    // VARIABLES DE META
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
@@ -307,7 +319,7 @@
       currentCallback = callback;
     }
 
-    function confirmModal() {
+        function confirmModal() {
       const input = document.getElementById('modal-input');
       
       // Si el input está oculto (porque es una alerta o confirmación), enviamos 'true'.
@@ -326,7 +338,6 @@
 
     function formatear(n) { return new Intl.NumberFormat('es-VE').format(n); }
 
-    // GESTIÓN DE META
     function editarMetaManual() {
       customPrompt("¿Cuánto has recaudado hasta hoy ($)?", ahorroRecaudado, "number", (montoRec) => {
         const rec = parseFloat(montoRec);
@@ -357,8 +368,6 @@
 
       const calcTotal = (lista) => lista.reduce((a, b) => a + b.monto_bs, 0);
       
-      // El cálculo en USD ahora siempre usa la tasa registrada con el pago
-      // (Se usa || 1 por si en el futuro se importan datos viejos sin tasas, para evitar errores matemáticos)
       const calcUSD = (lista, tipoTasa = 'of') => lista.reduce((acc, s) => {
         let tF = tipoTasa === 'of' ? s.tasa_sem_of : s.tasa_sem_pa;
         return acc + (s.monto_bs / (tF || 1));
@@ -386,7 +395,6 @@
       document.getElementById('general-usd-of').textContent = formatear(calcUSD(semanas, 'of').toFixed(2)) + " $ BCV";
       document.getElementById('general-usd-pa').textContent = formatear(calcUSD(semanas, 'pa').toFixed(2)) + " $ Par.";
 
-      // ACTUALIZAR BARRA DE META
       let porcentaje = 0;
       if(metaAhorro > 0) porcentaje = Math.min((ahorroRecaudado / metaAhorro) * 100, 100);
       document.getElementById('meta-display').textContent = `${formatear(ahorroRecaudado)} $ / ${formatear(metaAhorro)} $`;
@@ -395,12 +403,23 @@
       const faltante = Math.max(metaAhorro - ahorroRecaudado, 0);
       document.getElementById('meta-restante').textContent = `Faltan: ${formatear(faltante.toFixed(2))} $`;
 
+      // LÓGICA DE FILTRADO PARA LA TABLA
+      const desde = document.getElementById('filtro-desde').value;
+      const hasta = document.getElementById('filtro-hasta').value;
+      let semanasFiltradas = [...semanas];
+
+      if (desde || hasta) {
+        semanasFiltradas = semanas.filter(s => {
+          if (desde && s.fecha < desde) return false;
+          if (hasta && s.fecha > hasta) return false;
+          return true;
+        });
+      }
+
       const tbody = document.getElementById('tabla-body');
-      tbody.innerHTML = semanas.slice().reverse().map((s, i) => {
-        const idx = semanas.length - 1 - i;
+      tbody.innerHTML = semanasFiltradas.slice().reverse().map((s) => {
+        const idxOriginal = semanas.indexOf(s); // Referencia correcta al array original
         const d = new Date(s.fecha + "T00:00:00");
-        
-        // Asignamos las tasas guardadas o 1 por si es un registro legacy defectuoso
         const tOf = s.tasa_sem_of || 1;
         const tPa = s.tasa_sem_pa || 1;
 
@@ -409,8 +428,8 @@
           <td style="font-weight:bold;">${formatear(s.monto_bs)}</td>
           <td style="color:var(--import); font-weight:500;">${(s.monto_bs / tOf).toFixed(2)}$</td>
           <td style="color:var(--danger); font-weight:500;">${(s.monto_bs / tPa).toFixed(2)}$</td>
-          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idx})">✏️</button>
-          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idx})">✖</button></div></td></tr>`;
+          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idxOriginal})">✏️</button>
+          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idxOriginal})">✖</button></div></td></tr>`;
       }).join('');
       
       actualizarGrafico();
@@ -422,15 +441,12 @@
         customPrompt("Editar Monto (Bs):", semanas[i].monto_bs, "number", (nm) => {
           const montoNum = parseFloat(nm);
           if (isNaN(montoNum)) return;
-          
           customPrompt("Editar Tasa BCV:", semanas[i].tasa_sem_of || "", "number", (ntOf) => {
             customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
-              
               semanas[i].fecha = nf;
               semanas[i].monto_bs = montoNum;
               if (!isNaN(parseFloat(ntOf))) semanas[i].tasa_sem_of = parseFloat(ntOf);
               if (!isNaN(parseFloat(ntPa))) semanas[i].tasa_sem_pa = parseFloat(ntPa);
-              
               semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
               localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
               actualizarInterfaz();
@@ -446,7 +462,6 @@
       const mesesConDatos = [...new Set(sueldosOnly.map(s => new Date(s.fecha + "T00:00:00").getMonth()))].sort((a,b)=>a-b);
       const mIndices = mesesConDatos.length > 0 ? mesesConDatos : [new Date().getMonth()];
       
-      // La gráfica ahora utiliza la tasa guardada en cada registro de sueldo para ser precisa
       const getVal = (m, t) => sueldosOnly
         .filter(s => new Date(s.fecha + "T00:00:00").getMonth() === m)
         .reduce((acc, s) => acc + (s.monto_bs / (t === 'of' ? (s.tasa_sem_of || 1) : (s.tasa_sem_pa || 1))), 0);
@@ -469,7 +484,6 @@
       const tOf = parseFloat(document.getElementById('tasa_registro_of').value);
       const tPa = parseFloat(document.getElementById('tasa_registro_pa').value);
       
-      // Ahora es obligatorio colocar ambas tasas para cualquier registro
       if(!f || isNaN(m) || isNaN(tOf) || isNaN(tPa)) {
         return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
       }
@@ -490,6 +504,19 @@
       document.getElementById('tasa_registro_of').value = ""; 
       document.getElementById('tasa_registro_pa').value = "";
       
+      Toastify({
+        text: `✅ ${t} registrado correctamente`,
+        duration: 3000,
+        gravity: "top",
+        position: "center",
+        stopOnFocus: true,
+        style: {
+          background: "linear-gradient(to right, #0f3460, #2e7d32)",
+          borderRadius: "10px",
+          fontWeight: "bold"
+        }
+      }).showToast();
+
       actualizarInterfaz();
     }
 
@@ -503,22 +530,23 @@
       }); 
     }
 
+    function limpiarFiltros() {
+      document.getElementById('filtro-desde').value = "";
+      document.getElementById('filtro-hasta').value = "";
+      actualizarInterfaz();
+    }
+
     function exportarTodo() {
       if (semanas.length === 0) return customPrompt("No hay datos", "", "alert");
       customPrompt(`Exportar ${semanas.length} registros. ¿Continuar?`, "", "confirm", (c) => {
         if(!c) return;
         let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;USD_BCV;USD_PAR\n";
-        
-        // Exportar Meta y Recaudado
         csv += `META;${metaAhorro};${ahorroRecaudado};;;;;\n`;
-        
-        // Exportar pagos con sus tasas incrustadas
         semanas.forEach(s => {
           const tOf = s.tasa_sem_of || 1;
           const tPa = s.tasa_sem_pa || 1;
           csv += `PAGO;${s.fecha};${s.tipo||'Sueldo'};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};${(s.monto_bs/tOf).toFixed(2)};${(s.monto_bs/tPa).toFixed(2)}\n`;
         });
-        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -535,7 +563,6 @@
         reader.onload = (e) => {
           const lineas = e.target.result.replace(/^\uFEFF/, "").split(/\r?\n/);
           let nP = [];
-          
           lineas.forEach(l => {
             const c = l.trim().split(';');
             if(c[0] === "META") { 
@@ -554,13 +581,9 @@
                }); 
             }
           });
-          
           if(nP.length > 0) {
             semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha));
             localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-            // Como ya no se usan tasas mensuales generales, limpiamos ese localStorage si existe
-            localStorage.removeItem('tasasOficiales');
-            localStorage.removeItem('tasasParalelo');
             location.reload();
           }
         };
