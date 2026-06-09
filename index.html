@@ -494,8 +494,8 @@
       }
     }
 
-    // NUEVA FUNCIÓN: Busca la tasa paralelo automáticamente para cualquier categoría
-    function manejarCambioCategoria() {
+    // MODIFICADA: Busca la tasa paralelo automáticamente y controla si avisa visualmente o no
+    function manejarCambioCategoria(mostrarAlerta = true) {
       const inputParalelo = document.getElementById('tasa_registro_pa');
 
       // Si ya tiene una tasa escrita o cargada, evitamos pisarla
@@ -513,13 +513,16 @@
               inputParalelo.value = tasaParalelo.toFixed(2);
               inputParalelo.style.backgroundColor = "#ffebee"; // Color rojo sutil para paralelo
               
-              Toastify({
-                text: `🔥 Tasa Paralelo actualizada: ${tasaParalelo.toFixed(2)} Bs`,
-                duration: 2500,
-                gravity: "top",
-                position: "center",
-                style: { background: "#d32f2f", borderRadius: "10px", fontWeight: "bold" }
-              }).showToast();
+              // Solo muestra el Toast si se permite (al cambiar manualmente la categoría)
+              if (mostrarAlerta) {
+                Toastify({
+                  text: `🔥 Tasa Paralelo actualizada: ${tasaParalelo.toFixed(2)} Bs`,
+                  duration: 2500,
+                  gravity: "top",
+                  position: "center",
+                  style: { background: "#d32f2f", borderRadius: "10px", fontWeight: "bold" }
+                }).showToast();
+              }
             }
           }
         })
@@ -528,13 +531,15 @@
           inputParalelo.placeholder = "0.00";
           inputParalelo.style.backgroundColor = "white";
           
-          Toastify({
-            text: "⚠️ No se pudo cargar la tasa paralelo automáticamente. Ingrésala manual.",
-            duration: 3500,
-            gravity: "top",
-            position: "center",
-            style: { background: "#f39c12", borderRadius: "10px", fontWeight: "bold" }
-          }).showToast();
+          if (mostrarAlerta) {
+            Toastify({
+              text: "⚠️ No se pudo cargar la tasa paralelo automáticamente. Ingrésala manual.",
+              duration: 3500,
+              gravity: "top",
+              position: "center",
+              style: { background: "#f39c12", borderRadius: "10px", fontWeight: "bold" }
+            }).showToast();
+          }
         });
     }
 
@@ -583,7 +588,7 @@
       }).showToast();
 
       autocompletarTasaMensual();
-      manejarCambioCategoria(); // Re-invoca la tasa para el siguiente registro
+      manejarCambioCategoria(false); // Silencioso al prepararse para el siguiente registro
       actualizarInterfaz();
     }
 
@@ -603,6 +608,7 @@
       actualizarInterfaz();
     }
 
+    // Exportación e Importación de respaldos
     function exportarTodo() {
       if (semanas.length === 0) return customPrompt("No hay datos", "", "alert");
       customPrompt(`Exportar ${semanas.length} registros. ¿Continuar?`, "", "confirm", (c) => {
@@ -672,11 +678,11 @@
     document.getElementById('fecha').addEventListener('change', autocompletarTasaMensual);
     
     // Escucha activamente el cambio de cualquier categoría
-    document.getElementById('tipo_ingreso').addEventListener('change', manejarCambioCategoria);
+    document.getElementById('tipo_ingreso').addEventListener('change', () => manejarCambioCategoria(true));
     
     // Arranque inicial de la app
     autocompletarTasaMensual();
-    manejarCambioCategoria(); // Carga la tasa paralelo inmediatamente al abrir la app
+    manejarCambioCategoria(false); // Carga silenciosa al arrancar la app por primera vez
     actualizarInterfaz();
   </script>
 </body>
