@@ -300,6 +300,32 @@
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
+    // ==========================================
+    // SCRIPT DE AUTO-CURACIÓN DE TASAS HISTÓRICAS
+    // ==========================================
+    let huboMigracion = false;
+    semanas.forEach(s => {
+      if (!s.tasa_sem_of && (s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of)) {
+        s.tasa_sem_of = parseFloat(s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of);
+        huboMigracion = true;
+      }
+      if (!s.tasa_sem_pa && (s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa)) {
+        s.tasa_sem_pa = parseFloat(s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa);
+        huboMigracion = true;
+      }
+      if (!s.tasa_sem_of && s.fecha) {
+        const añoMes = s.fecha.substring(0, 7);
+        const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
+        if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
+          s.tasa_sem_of = parseFloat(tasaGuardada);
+          huboMigracion = true;
+        }
+      }
+    });
+    if (huboMigracion) {
+      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+    }
+
     let currentCallback = null;
     function customPrompt(mensaje, valorDefecto, tipo, callback) {
       document.getElementById('modal-message').innerText = mensaje;
@@ -309,7 +335,11 @@
       btnCancel.style.display = 'block';
       if(tipo === 'alert') { input.style.display = 'none'; btnCancel.style.display = 'none'; }
       else if(tipo === 'confirm') { input.style.display = 'none'; }
-      else { input.type = tipo; input.value = valorDefecto; }
+      else { 
+        input.type = tipo; 
+        input.value = valorDefecto; 
+        if (tipo === 'number') input.step = 'any'; // Permite decimales en los modales
+      }
       document.getElementById('custom-modal').style.display = 'flex';
       currentCallback = callback;
     }
@@ -395,10 +425,12 @@
 
       const desde = document.getElementById('filtro-desde').value;
       const hasta = document.getElementById('filtro-hasta').value;
-      let semanasFiltradas = [...semanas];
+      
+      // Mapeamos el índice real de forma estricta para el renderizado de la tabla
+      let semanasFiltradas = semanas.map((s, idx) => ({ ...s, idxOriginal: idx }));
 
       if (desde || hasta) {
-        semanasFiltradas = semanas.filter(s => {
+        semanasFiltradas = semanasFiltradas.filter(s => {
           if (desde && s.fecha < desde) return false;
           if (hasta && s.fecha > hasta) return false;
           return true;
@@ -407,7 +439,6 @@
 
       const tbody = document.getElementById('tabla-body');
       tbody.innerHTML = semanasFiltradas.slice().reverse().map((s) => {
-        const idxOriginal = semanas.indexOf(s);
         const d = new Date(s.fecha + "T00:00:00");
         const tOf = s.tasa_sem_of || 1;
         const tPa = s.tasa_sem_pa || 1;
@@ -415,16 +446,15 @@
         return `<tr><td><strong>${NOMBRES_DIAS[d.getDay()]}</strong><br>${s.fecha.split('-').reverse().slice(0,2).join('/')}</td>
           <td><span class="tag tag-${(s.tipo || 'Sueldo').toLowerCase()}">${s.tipo || 'Sueldo'}</span></td>
           <td style="font-weight:bold;">${formatear(s.monto_bs)}</td>
-          <td style="color:var(--import); font-weight:500;">${(s.monto_bs / tOf).toFixed(2)}$</td>
-          <td style="color:var(--danger); font-weight:500;">${(s.monto_bs / tPa).toFixed(2)}$</td>
-          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${idxOriginal})">✏️</button>
-          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${idxOriginal})">✖</button></div></td></tr>`;
+          <td style="color:var(--import); font-weight:500;" title="Tasa: ${tOf}">${(s.monto_bs / tOf).toFixed(2)}$</td>
+          <td style="color:var(--danger); font-weight:500;" title="Tasa: ${tPa}">${(s.monto_bs / tPa).toFixed(2)}$</td>
+          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${s.idxOriginal})">✏️</button>
+          <button class="acciones-btn" style="color:red;" onclick="borrarReg(${s.idxOriginal})">✖</button></div></td></tr>`;
       }).join('');
       
       actualizarGrafico();
     }
 
-    // --- FUNCIÓN DEL LÁPIZ REESTRUCTURADA: VERIFICA LA MEMORIA MENSUAL ---
     function editarReg(i) {
       customPrompt("Editar Fecha:", semanas[i].fecha, "date", (nf) => {
         if (!nf) return;
@@ -433,14 +463,11 @@
           const montoNum = parseFloat(nm);
           if (isNaN(montoNum)) return;
           
-          // Determinamos el año-mes de la NUEVA fecha seleccionada en el prompt
           const nuevoAñoMes = nf.substring(0, 7);
           const tasaMesExistente = localStorage.getItem(`tasa_mes_bcv_${nuevoAñoMes}`);
           
-          // Lógica inteligente: Si el mes nuevo ya tiene una tasa registrada en memoria, úsala.
-          // Si el mes está completamente vacío, déjalo en blanco ("") para obligar a rellenarlo.
-          let tasaSugerida = "";
-          if (tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
+          let tasaSugerida = semanas[i].tasa_sem_of || "";
+          if (!tasaSugerida && tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
             tasaSugerida = parseFloat(tasaMesExistente).toFixed(2);
           }
 
@@ -454,7 +481,6 @@
               
               if (!isNaN(bcvFinal)) {
                 semanas[i].tasa_sem_of = bcvFinal;
-                // Si el usuario ingresó una tasa válida, actualizamos la memoria de ese mes
                 localStorage.setItem(`tasa_mes_bcv_${nuevoAñoMes}`, bcvFinal);
               }
               if (!isNaN(parFinal)) semanas[i].tasa_sem_pa = parFinal;
@@ -472,7 +498,13 @@
 
     function actualizarGrafico() {
       const ctx = document.getElementById('graficoMensual').getContext('2d');
-      const sueldosOnly = semanas.filter(s => s.tipo === 'Sueldo' || !s.tipo);
+      const añoActual = new Date().getFullYear();
+      
+      const sueldosOnly = semanas.filter(s => 
+        (s.tipo === 'Sueldo' || !s.tipo) && 
+        new Date(s.fecha + "T00:00:00").getFullYear() === añoActual
+      );
+      
       const mesesConDatos = [...new Set(sueldosOnly.map(s => new Date(s.fecha + "T00:00:00").getMonth()))].sort((a,b)=>a-b);
       const mIndices = mesesConDatos.length > 0 ? mesesConDatos : [new Date().getMonth()];
       
@@ -601,6 +633,10 @@
       });
     }
 
+    function importingTodo(input) { // Mantenemos compatibilidad con el input onchange del HTML
+      importarTodo(input);
+    }
+
     function importarTodo(input) {
       if(!input.files[0]) return;
       customPrompt("¿Borrar actuales e importar respaldo?", "", "confirm", (c) => {
@@ -646,9 +682,11 @@
       }); 
     }
 
-    // --- BLOQUE INICIALIZADOR DE EVENTOS OPTIMIZADO ---
+    // --- BLOQUE INICIALIZADOR CON MEJORA DE ZONA HORARIA LOCAL ---
     const inputFechaElemento = document.getElementById('fecha');
-    inputFechaElemento.value = new Date().toISOString().split('T')[0];
+    const fechaLocal = new Date();
+    fechaLocal.setMinutes(fechaLocal.getMinutes() - fechaLocal.getTimezoneOffset());
+    inputFechaElemento.value = fechaLocal.toISOString().split('T')[0];
     
     inputFechaElemento.addEventListener('change', autocompletarTasaMensual);
     inputFechaElemento.addEventListener('input', autocompletarTasaMensual);
