@@ -17,9 +17,7 @@
 
   <title>Mis pagos</title>
   
-  <!-- Librerías Externas -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <!-- Toastify CSS & JS -->
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
   <script type="text/javascript" src="https://cdn.jsdelivr.net/npm/toastify-js"></script>
 
@@ -104,7 +102,6 @@
     }
     .btn-main { background: var(--primary); color: white; }
 
-    /* ESTILOS DE LA BARRA DE META */
     .meta-card { background: #fff; border-left: 5px solid var(--excel); margin-top: 5px; }
     .meta-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
     .meta-monto { font-weight: 800; color: var(--excel); font-size: 1.2rem; margin-bottom: 10px; }
@@ -263,7 +260,6 @@
   <details class="card" open>
     <summary>📋 Historial de Pagos y Respaldo</summary>
     
-    <!-- NUEVO: FILTRO POR FECHA -->
     <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
       <div><label>Desde:</label><input type="date" id="filtro-desde" onchange="actualizarInterfaz()"></div>
       <div><label>Hasta:</label><input type="date" id="filtro-hasta" onchange="actualizarInterfaz()"></div>
@@ -301,7 +297,6 @@
     
     let chartInstance = null;
     let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
-    
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
@@ -321,11 +316,7 @@
 
     function confirmModal() {
       const input = document.getElementById('modal-input');
-      
-      // Si el input está oculto (porque es una alerta o confirmación), enviamos 'true'.
-      // Si está visible (porque estamos editando datos), enviamos lo que el usuario escribió.
       const val = input.style.display === 'none' ? true : input.value;
-      
       const callbackARecordar = currentCallback;
       closeModal();
       if (callbackARecordar) callbackARecordar(val);
@@ -367,7 +358,6 @@
       });
 
       const calcTotal = (lista) => lista.reduce((a, b) => a + b.monto_bs, 0);
-      
       const calcUSD = (lista, tipoTasa = 'of') => lista.reduce((acc, s) => {
         let tF = tipoTasa === 'of' ? s.tasa_sem_of : s.tasa_sem_pa;
         return acc + (s.monto_bs / (tF || 1));
@@ -403,7 +393,6 @@
       const faltante = Math.max(metaAhorro - ahorroRecaudado, 0);
       document.getElementById('meta-restante').textContent = `Faltan: ${formatear(faltante.toFixed(2))} $`;
 
-      // LÓGICA DE FILTRADO PARA LA TABLA
       const desde = document.getElementById('filtro-desde').value;
       const hasta = document.getElementById('filtro-hasta').value;
       let semanasFiltradas = [...semanas];
@@ -418,7 +407,7 @@
 
       const tbody = document.getElementById('tabla-body');
       tbody.innerHTML = semanasFiltradas.slice().reverse().map((s) => {
-        const idxOriginal = semanas.indexOf(s); // Referencia correcta al array original
+        const idxOriginal = semanas.indexOf(s);
         const d = new Date(s.fecha + "T00:00:00");
         const tOf = s.tasa_sem_of || 1;
         const tPa = s.tasa_sem_pa || 1;
@@ -435,20 +424,45 @@
       actualizarGrafico();
     }
 
+    // --- FUNCIÓN DEL LÁPIZ REESTRUCTURADA: VERIFICA LA MEMORIA MENSUAL ---
     function editarReg(i) {
       customPrompt("Editar Fecha:", semanas[i].fecha, "date", (nf) => {
         if (!nf) return;
+        
         customPrompt("Editar Monto (Bs):", semanas[i].monto_bs, "number", (nm) => {
           const montoNum = parseFloat(nm);
           if (isNaN(montoNum)) return;
-          customPrompt("Editar Tasa BCV:", semanas[i].tasa_sem_of || "", "number", (ntOf) => {
+          
+          // Determinamos el año-mes de la NUEVA fecha seleccionada en el prompt
+          const nuevoAñoMes = nf.substring(0, 7);
+          const tasaMesExistente = localStorage.getItem(`tasa_mes_bcv_${nuevoAñoMes}`);
+          
+          // Lógica inteligente: Si el mes nuevo ya tiene una tasa registrada en memoria, úsala.
+          // Si el mes está completamente vacío, déjalo en blanco ("") para obligar a rellenarlo.
+          let tasaSugerida = "";
+          if (tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
+            tasaSugerida = parseFloat(tasaMesExistente).toFixed(2);
+          }
+
+          customPrompt("Editar Tasa BCV:", tasaSugerida, "number", (ntOf) => {
             customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
               semanas[i].fecha = nf;
               semanas[i].monto_bs = montoNum;
-              if (!isNaN(parseFloat(ntOf))) semanas[i].tasa_sem_of = parseFloat(ntOf);
-              if (!isNaN(parseFloat(ntPa))) semanas[i].tasa_sem_pa = parseFloat(ntPa);
+              
+              const bcvFinal = parseFloat(ntOf);
+              const parFinal = parseFloat(ntPa);
+              
+              if (!isNaN(bcvFinal)) {
+                semanas[i].tasa_sem_of = bcvFinal;
+                // Si el usuario ingresó una tasa válida, actualizamos la memoria de ese mes
+                localStorage.setItem(`tasa_mes_bcv_${nuevoAñoMes}`, bcvFinal);
+              }
+              if (!isNaN(parFinal)) semanas[i].tasa_sem_pa = parFinal;
+              
               semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
               localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+              
+              autocompletarTasaMensual();
               actualizarInterfaz();
             });
           });
@@ -478,32 +492,33 @@
     }
 
     function autocompletarTasaMensual() {
-      const fechaSeleccionada = document.getElementById('fecha').value;
-      if (!fechaSeleccionada) return;
-
-      const añoMes = fechaSeleccionada.substring(0, 7); // Obtiene "YYYY-MM"
-      const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
+      const inputFecha = document.getElementById('fecha');
       const inputBCV = document.getElementById('tasa_registro_of');
       
-      if (tasaGuardada) {
-        inputBCV.value = tasaGuardada;
-        inputBCV.style.backgroundColor = "#e8f0fe"; 
-      } else {
+      if (!inputFecha || !inputFecha.value) {
         inputBCV.value = "";
         inputBCV.style.backgroundColor = "white";
+        return;
+      }
+
+      const añoMes = inputFecha.value.substring(0, 7); 
+      const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
+      
+      if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
+        inputBCV.value = parseFloat(tasaGuardada).toFixed(2);
+        inputBCV.style.backgroundColor = "#e8f0fe"; 
+      } else {
+        inputBCV.value = ""; 
+        inputBCV.placeholder = "0.00";
+        inputBCV.style.backgroundColor = "#fff3cd"; 
       }
     }
 
-    // MODIFICADA: Busca la tasa paralelo automáticamente y controla si avisa visualmente o no
-    function manejarCambioCategoria(mostrarAlerta = true) {
+    function marcharCambioCategoria(mostrarAlerta = true) {
       const inputParalelo = document.getElementById('tasa_registro_pa');
-
-      // Si ya tiene una tasa escrita o cargada, evitamos pisarla
       if (inputParalelo.value !== "") return;
-
       inputParalelo.placeholder = "Cargando...";
-      inputParalelo.style.backgroundColor = "#fff9c4"; // Fondo amarillo de carga
-
+      inputParalelo.style.backgroundColor = "#fff9c4"; 
       fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
         .then(response => response.json())
         .then(data => {
@@ -511,35 +526,16 @@
             const tasaParalelo = parseFloat(data.promedio);
             if (!isNaN(tasaParalelo)) {
               inputParalelo.value = tasaParalelo.toFixed(2);
-              inputParalelo.style.backgroundColor = "#ffebee"; // Color rojo sutil para paralelo
-              
-              // Solo muestra el Toast si se permite (al cambiar manualmente la categoría)
+              inputParalelo.style.backgroundColor = "#ffebee"; 
               if (mostrarAlerta) {
-                Toastify({
-                  text: `🔥 Tasa Paralelo actualizada: ${tasaParalelo.toFixed(2)} Bs`,
-                  duration: 2500,
-                  gravity: "top",
-                  position: "center",
-                  style: { background: "#d32f2f", borderRadius: "10px", fontWeight: "bold" }
-                }).showToast();
+                Toastify({ text: `🔥 Tasa Paralelo: ${tasaParalelo.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#d32f2f", borderRadius: "10px" } }).showToast();
               }
             }
           }
         })
         .catch(error => {
-          console.error("Error al consultar la API:", error);
           inputParalelo.placeholder = "0.00";
           inputParalelo.style.backgroundColor = "white";
-          
-          if (mostrarAlerta) {
-            Toastify({
-              text: "⚠️ No se pudo cargar la tasa paralelo automáticamente. Ingrésala manual.",
-              duration: 3500,
-              gravity: "top",
-              position: "center",
-              style: { background: "#f39c12", borderRadius: "10px", fontWeight: "bold" }
-            }).showToast();
-          }
         });
     }
 
@@ -554,41 +550,19 @@
         return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
       }
       
-      let nuevo = {
-        fecha: f, 
-        monto_bs: m, 
-        tipo: t,
-        tasa_sem_of: tOf,
-        tasa_sem_pa: tPa
-      };
+      const añoMes = f.substring(0, 7);
+      localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
+      
+      let nuevo = { fecha: f, monto_bs: m, tipo: t, tasa_sem_of: tOf, tasa_sem_pa: tPa };
       
       semanas.push(nuevo); 
       semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
       localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-
-      // GUARDAR LA TASA BCV DEL MES ACTUAL
-      const añoMes = f.substring(0, 7);
-      localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
       
       document.getElementById('monto_bs').value = ""; 
-      document.getElementById('tasa_registro_of').value = ""; 
-      document.getElementById('tasa_registro_pa').value = "";
-      
-      Toastify({
-        text: `✅ ${t} registrado correctamente`,
-        duration: 3000,
-        gravity: "top",
-        position: "center",
-        stopOnFocus: true,
-        style: {
-          background: "linear-gradient(to right, #0f3460, #2e7d32)",
-          borderRadius: "10px",
-          fontWeight: "bold"
-        }
-      }).showToast();
+      Toastify({ text: `✅ ${t} registrado`, duration: 3000, gravity: "top", position: "center", style: { background: "linear-gradient(to right, #0f3460, #2e7d32)", borderRadius: "10px" } }).showToast();
 
       autocompletarTasaMensual();
-      manejarCambioCategoria(false); // Silencioso al prepararse para el siguiente registro
       actualizarInterfaz();
     }
 
@@ -608,7 +582,6 @@
       actualizarInterfaz();
     }
 
-    // Exportación e Importación de respaldos
     function exportarTodo() {
       if (semanas.length === 0) return customPrompt("No hay datos", "", "alert");
       customPrompt(`Exportar ${semanas.length} registros. ¿Continuar?`, "", "confirm", (c) => {
@@ -673,16 +646,18 @@
       }); 
     }
 
-    // Configuración Inicial de carga de página
-    document.getElementById('fecha').value = new Date().toISOString().split('T')[0];
-    document.getElementById('fecha').addEventListener('change', autocompletarTasaMensual);
+    // --- BLOQUE INICIALIZADOR DE EVENTOS OPTIMIZADO ---
+    const inputFechaElemento = document.getElementById('fecha');
+    inputFechaElemento.value = new Date().toISOString().split('T')[0];
     
-    // Escucha activamente el cambio de cualquier categoría
-    document.getElementById('tipo_ingreso').addEventListener('change', () => manejarCambioCategoria(true));
+    inputFechaElemento.addEventListener('change', autocompletarTasaMensual);
+    inputFechaElemento.addEventListener('input', autocompletarTasaMensual);
+    inputFechaElemento.addEventListener('blur', autocompletarTasaMensual);
+
+    document.getElementById('tipo_ingreso').addEventListener('change', () => marcharCambioCategoria(true));
     
-    // Arranque inicial de la app
     autocompletarTasaMensual();
-    manejarCambioCategoria(false); // Carga silenciosa al arrancar la app por primera vez
+    marcharCambioCategoria(false);
     actualizarInterfaz();
   </script>
 </body>
