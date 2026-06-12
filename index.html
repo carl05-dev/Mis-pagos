@@ -300,9 +300,9 @@
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
-    // ==========================================
-    // SCRIPT DE AUTO-CURACIÓN DE TASAS HISTÓRICAS
-    // ==========================================
+    // =========================================================
+    // SCRIPT DE AUTO-CURACIÓN AJUSTADO (SÓLO SI EXISTE LA DATA)
+    // =========================================================
     let huboMigracion = false;
     semanas.forEach(s => {
       if (!s.tasa_sem_of && (s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of)) {
@@ -313,7 +313,8 @@
         s.tasa_sem_pa = parseFloat(s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa);
         huboMigracion = true;
       }
-      if (!s.tasa_sem_of && s.fecha) {
+      // Sólo autocompleta con la mensual fija si el registro original era de tipo "Sueldo"
+      if (!s.tasa_sem_of && s.fecha && (!s.tipo || s.tipo === 'Sueldo')) {
         const añoMes = s.fecha.substring(0, 7);
         const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
         if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
@@ -338,7 +339,7 @@
       else { 
         input.type = tipo; 
         input.value = valorDefecto; 
-        if (tipo === 'number') input.step = 'any'; // Permite decimales en los modales
+        if (tipo === 'number') input.step = 'any';
       }
       document.getElementById('custom-modal').style.display = 'flex';
       currentCallback = callback;
@@ -426,7 +427,6 @@
       const desde = document.getElementById('filtro-desde').value;
       const hasta = document.getElementById('filtro-hasta').value;
       
-      // Mapeamos el índice real de forma estricta para el renderizado de la tabla
       let semanasFiltradas = semanas.map((s, idx) => ({ ...s, idxOriginal: idx }));
 
       if (desde || hasta) {
@@ -464,15 +464,20 @@
           if (isNaN(montoNum)) return;
           
           const nuevoAñoMes = nf.substring(0, 7);
-          const tasaMesExistente = localStorage.getItem(`tasa_mes_bcv_${nuevoAñoMes}`);
+          const tipoReg = semanas[i].tipo || 'Sueldo';
           
           let tasaSugerida = semanas[i].tasa_sem_of || "";
-          if (!tasaSugerida && tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
-            tasaSugerida = parseFloat(tasaMesExistente).toFixed(2);
+          
+          // Al editar, sólo sugerimos tasa fija mensual si es de categoría "Sueldo"
+          if (!tasaSugerida && tipoReg === 'Sueldo') {
+            const tasaMesExistente = localStorage.getItem(`tasa_mes_bcv_${nuevoAñoMes}`);
+            if (tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
+              tasaSugerida = parseFloat(tasaMesExistente).toFixed(2);
+            }
           }
 
-          customPrompt("Editar Tasa BCV:", tasaSugerida, "number", (ntOf) => {
-            customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
+          customPrompt(`Editar Tasa BCV (${tipoReg}):`, tasaSugerida, "number", (ntOf) => {
+            customPrompt(`Editar Tasa Par. (${tipoReg}):`, semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
               semanas[i].fecha = nf;
               semanas[i].monto_bs = montoNum;
               
@@ -481,7 +486,10 @@
               
               if (!isNaN(bcvFinal)) {
                 semanas[i].tasa_sem_of = bcvFinal;
-                localStorage.setItem(`tasa_mes_bcv_${nuevoAñoMes}`, bcvFinal);
+                // Guardamos tasa fija mensual únicamente si es Sueldo
+                if (tipoReg === 'Sueldo') {
+                  localStorage.setItem(`tasa_mes_bcv_${nuevoAñoMes}`, bcvFinal);
+                }
               }
               if (!isNaN(parFinal)) semanas[i].tasa_sem_pa = parFinal;
               
@@ -523,9 +531,13 @@
       });
     }
 
+    // =========================================================
+    // LÓGICA FILTRADA DE AUTOCOMPLETADO SEGÚN LA CATEGORÍA
+    // =========================================================
     function autocompletarTasaMensual() {
       const inputFecha = document.getElementById('fecha');
       const inputBCV = document.getElementById('tasa_registro_of');
+      const categoria = document.getElementById('tipo_ingreso').value;
       
       if (!inputFecha || !inputFecha.value) {
         inputBCV.value = "";
@@ -533,12 +545,21 @@
         return;
       }
 
+      // Si NO es Sueldo, la tasa varía por semana. No forzar la tasa guardada del mes.
+      if (categoria !== 'Sueldo') {
+        inputBCV.value = ""; 
+        inputBCV.placeholder = "Tasa de esta semana";
+        inputBCV.style.backgroundColor = "#fff3cd"; // Alerta visual amarilla (campo libre)
+        return;
+      }
+
+      // Si es Sueldo, buscamos y aplicamos la tasa fija del mes
       const añoMes = inputFecha.value.substring(0, 7); 
       const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
       
       if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
         inputBCV.value = parseFloat(tasaGuardada).toFixed(2);
-        inputBCV.style.backgroundColor = "#e8f0fe"; 
+        inputBCV.style.backgroundColor = "#e8f0fe"; // Azul bloqueo (autocompletado)
       } else {
         inputBCV.value = ""; 
         inputBCV.placeholder = "0.00";
@@ -548,6 +569,10 @@
 
     function marcharCambioCategoria(mostrarAlerta = true) {
       const inputParalelo = document.getElementById('tasa_registro_pa');
+      
+      // Cada vez que cambia la categoría, re-evaluamos el comportamiento del campo BCV
+      autocompletarTasaMensual();
+
       if (inputParalelo.value !== "") return;
       inputParalelo.placeholder = "Cargando...";
       inputParalelo.style.backgroundColor = "#fff9c4"; 
@@ -582,8 +607,11 @@
         return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
       }
       
-      const añoMes = f.substring(0, 7);
-      localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
+      // Guardar en la base de datos mensual global SOLAMENTE si es tipo Sueldo
+      if (t === 'Sueldo') {
+        const añoMes = f.substring(0, 7);
+        localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
+      }
       
       let nuevo = { fecha: f, monto_bs: m, tipo: t, tasa_sem_of: tOf, tasa_sem_pa: tPa };
       
@@ -633,10 +661,6 @@
       });
     }
 
-    function importingTodo(input) { // Mantenemos compatibilidad con el input onchange del HTML
-      importarTodo(input);
-    }
-
     function importarTodo(input) {
       if(!input.files[0]) return;
       customPrompt("¿Borrar actuales e importar respaldo?", "", "confirm", (c) => {
@@ -682,7 +706,7 @@
       }); 
     }
 
-    // --- BLOQUE INICIALIZADOR CON MEJORA DE ZONA HORARIA LOCAL ---
+    // --- BLOQUE INICIALIZADOR ---
     const inputFechaElemento = document.getElementById('fecha');
     const fechaLocal = new Date();
     fechaLocal.setMinutes(fechaLocal.getMinutes() - fechaLocal.getTimezoneOffset());
@@ -692,6 +716,7 @@
     inputFechaElemento.addEventListener('input', autocompletarTasaMensual);
     inputFechaElemento.addEventListener('blur', autocompletarTasaMensual);
 
+    // Evento de escucha al cambiar de categoría
     document.getElementById('tipo_ingreso').addEventListener('change', () => marcharCambioCategoria(true));
     
     autocompletarTasaMensual();
