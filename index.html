@@ -253,7 +253,7 @@
   </div>
 
   <div class="card">
-    <summary style="list-style: none;">📈 Histórico Mensual</summary>
+    <summary style="list-style: none; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 Histórico de Sueldo Mensual</summary>
     <div class="chart-container"><canvas id="graficoMensual"></canvas></div>
   </div>
 
@@ -300,9 +300,10 @@
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
-    // =========================================================
-    // SCRIPT DE AUTO-CURACIÓN AJUSTADO (SÓLO SI EXISTE LA DATA)
-    // =========================================================
+    let tasaBcvApiDelDia = null;
+    let tasaParaleloApiDelDia = null;
+
+    // Auto-curación limpia
     let huboMigracion = false;
     semanas.forEach(s => {
       if (!s.tasa_sem_of && (s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of)) {
@@ -312,15 +313,6 @@
       if (!s.tasa_sem_pa && (s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa)) {
         s.tasa_sem_pa = parseFloat(s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa);
         huboMigracion = true;
-      }
-      // Sólo autocompleta con la mensual fija si el registro original era de tipo "Sueldo"
-      if (!s.tasa_sem_of && s.fecha && (!s.tipo || s.tipo === 'Sueldo')) {
-        const añoMes = s.fecha.substring(0, 7);
-        const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
-        if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
-          s.tasa_sem_of = parseFloat(tasaGuardada);
-          huboMigracion = true;
-        }
       }
     });
     if (huboMigracion) {
@@ -463,20 +455,9 @@
           const montoNum = parseFloat(nm);
           if (isNaN(montoNum)) return;
           
-          const nuevoAñoMes = nf.substring(0, 7);
           const tipoReg = semanas[i].tipo || 'Sueldo';
           
-          let tasaSugerida = semanas[i].tasa_sem_of || "";
-          
-          // Al editar, sólo sugerimos tasa fija mensual si es de categoría "Sueldo"
-          if (!tasaSugerida && tipoReg === 'Sueldo') {
-            const tasaMesExistente = localStorage.getItem(`tasa_mes_bcv_${nuevoAñoMes}`);
-            if (tasaMesExistente && tasaMesExistente !== "undefined" && tasaMesExistente !== "null") {
-              tasaSugerida = parseFloat(tasaMesExistente).toFixed(2);
-            }
-          }
-
-          customPrompt(`Editar Tasa BCV (${tipoReg}):`, tasaSugerida, "number", (ntOf) => {
+          customPrompt(`Editar Tasa BCV (${tipoReg}):`, semanas[i].tasa_sem_of || "", "number", (ntOf) => {
             customPrompt(`Editar Tasa Par. (${tipoReg}):`, semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
               semanas[i].fecha = nf;
               semanas[i].monto_bs = montoNum;
@@ -484,19 +465,13 @@
               const bcvFinal = parseFloat(ntOf);
               const parFinal = parseFloat(ntPa);
               
-              if (!isNaN(bcvFinal)) {
-                semanas[i].tasa_sem_of = bcvFinal;
-                // Guardamos tasa fija mensual únicamente si es Sueldo
-                if (tipoReg === 'Sueldo') {
-                  localStorage.setItem(`tasa_mes_bcv_${nuevoAñoMes}`, bcvFinal);
-                }
-              }
+              if (!isNaN(bcvFinal)) semanas[i].tasa_sem_of = bcvFinal;
               if (!isNaN(parFinal)) semanas[i].tasa_sem_pa = parFinal;
               
               semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
               localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
               
-              autocompletarTasaMensual();
+              marcharCambioCategoria(false);
               actualizarInterfaz();
             });
           });
@@ -532,65 +507,75 @@
     }
 
     // =========================================================
-    // LÓGICA FILTRADA DE AUTOCOMPLETADO SEGÚN LA CATEGORÍA
+    // LÓGICA DE ACTUALIZACIÓN INDEPENDIENTE SEMANA A SEMANA
     // =========================================================
-    function autocompletarTasaMensual() {
+    function marcharCambioCategoria(mostrarAlerta = true) {
       const inputFecha = document.getElementById('fecha');
       const inputBCV = document.getElementById('tasa_registro_of');
-      const categoria = document.getElementById('tipo_ingreso').value;
-      
-      if (!inputFecha || !inputFecha.value) {
-        inputBCV.value = "";
-        inputBCV.style.backgroundColor = "white";
-        return;
-      }
-
-      // Si NO es Sueldo, la tasa varía por semana. No forzar la tasa guardada del mes.
-      if (categoria !== 'Sueldo') {
-        inputBCV.value = ""; 
-        inputBCV.placeholder = "Tasa de esta semana";
-        inputBCV.style.backgroundColor = "#fff3cd"; // Alerta visual amarilla (campo libre)
-        return;
-      }
-
-      // Si es Sueldo, buscamos y aplicamos la tasa fija del mes
-      const añoMes = inputFecha.value.substring(0, 7); 
-      const tasaGuardada = localStorage.getItem(`tasa_mes_bcv_${añoMes}`);
-      
-      if (tasaGuardada && tasaGuardada !== "undefined" && tasaGuardada !== "null") {
-        inputBCV.value = parseFloat(tasaGuardada).toFixed(2);
-        inputBCV.style.backgroundColor = "#e8f0fe"; // Azul bloqueo (autocompletado)
-      } else {
-        inputBCV.value = ""; 
-        inputBCV.placeholder = "0.00";
-        inputBCV.style.backgroundColor = "#fff3cd"; 
-      }
-    }
-
-    function marcharCambioCategoria(mostrarAlerta = true) {
       const inputParalelo = document.getElementById('tasa_registro_pa');
       
-      // Cada vez que cambia la categoría, re-evaluamos el comportamiento del campo BCV
-      autocompletarTasaMensual();
+      if (!inputFecha || !inputFecha.value) return;
 
-      if (inputParalelo.value !== "") return;
+      // SIEMPRE JALA DE LA API EN TIEMPO REAL PARA CUALQUIER CATEGORÍA (INCLUYENDO SUELDO)
+      if (tasaBcvApiDelDia && tasaParaleloApiDelDia) {
+        inputBCV.value = tasaBcvApiDelDia.toFixed(2);
+        inputBCV.style.backgroundColor = "#e0f2f1"; // Fondo verde agua claro (Tasa API libre y fresca)
+        inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
+        inputParalelo.style.backgroundColor = "#ffebee";
+        return;
+      }
+
+      inputBCV.placeholder = "Cargando...";
       inputParalelo.placeholder = "Cargando...";
-      inputParalelo.style.backgroundColor = "#fff9c4"; 
-      fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
+      inputBCV.style.backgroundColor = "#fff9c4";
+      inputParalelo.style.backgroundColor = "#fff9c4";
+
+      // Fetch Oficial (BCV) en vivo
+      fetch('https://ve.dolarapi.com/v1/dolares/oficial')
         .then(response => response.json())
         .then(data => {
           if (data && data.promedio) {
-            const tasaParalelo = parseFloat(data.promedio);
-            if (!isNaN(tasaParalelo)) {
-              inputParalelo.value = tasaParalelo.toFixed(2);
-              inputParalelo.style.backgroundColor = "#ffebee"; 
+            tasaBcvApiDelDia = parseFloat(data.promedio);
+            if (!isNaN(tasaBcvApiDelDia)) {
+              inputBCV.value = tasaBcvApiDelDia.toFixed(2);
+              inputBCV.style.backgroundColor = "#e0f2f1"; 
               if (mostrarAlerta) {
-                Toastify({ text: `🔥 Tasa Paralelo: ${tasaParalelo.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#d32f2f", borderRadius: "10px" } }).showToast();
+                Toastify({ text: `💵 Tasa Oficial BCV: ${tasaBcvApiDelDia.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#0277bd", borderRadius: "10px" } }).showToast();
               }
             }
           }
         })
-        .catch(error => {
+        .catch(() => {
+          inputBCV.placeholder = "0.00";
+          inputBCV.style.backgroundColor = "white";
+        });
+
+      // Fetch Paralelo en vivo
+      cargarTasaParaleloAPI(inputParalelo, mostrarAlerta);
+    }
+
+    function cargarTasaParaleloAPI(inputParalelo, mostrarAlerta) {
+      if (tasaParaleloApiDelDia) {
+        inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
+        inputParalelo.style.backgroundColor = "#ffebee";
+        return;
+      }
+
+      fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
+        .then(response => response.json())
+        .then(data => {
+          if (data && data.promedio) {
+            tasaParaleloApiDelDia = parseFloat(data.promedio);
+            if (!isNaN(tasaParaleloApiDelDia)) {
+              inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
+              inputParalelo.style.backgroundColor = "#ffebee"; 
+              if (mostrarAlerta) {
+                Toastify({ text: `🔥 Tasa Paralelo: ${tasaParaleloApiDelDia.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#d32f2f", borderRadius: "10px" } }).showToast();
+              }
+            }
+          }
+        })
+        .catch(() => {
           inputParalelo.placeholder = "0.00";
           inputParalelo.style.backgroundColor = "white";
         });
@@ -607,12 +592,6 @@
         return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
       }
       
-      // Guardar en la base de datos mensual global SOLAMENTE si es tipo Sueldo
-      if (t === 'Sueldo') {
-        const añoMes = f.substring(0, 7);
-        localStorage.setItem(`tasa_mes_bcv_${añoMes}`, tOf);
-      }
-      
       let nuevo = { fecha: f, monto_bs: m, tipo: t, tasa_sem_of: tOf, tasa_sem_pa: tPa };
       
       semanas.push(nuevo); 
@@ -622,7 +601,7 @@
       document.getElementById('monto_bs').value = ""; 
       Toastify({ text: `✅ ${t} registrado`, duration: 3000, gravity: "top", position: "center", style: { background: "linear-gradient(to right, #0f3460, #2e7d32)", borderRadius: "10px" } }).showToast();
 
-      autocompletarTasaMensual();
+      marcharCambioCategoria(false);
       actualizarInterfaz();
     }
 
@@ -712,17 +691,14 @@
     fechaLocal.setMinutes(fechaLocal.getMinutes() - fechaLocal.getTimezoneOffset());
     inputFechaElemento.value = fechaLocal.toISOString().split('T')[0];
     
-    inputFechaElemento.addEventListener('change', autocompletarTasaMensual);
-    inputFechaElemento.addEventListener('input', autocompletarTasaMensual);
-    inputFechaElemento.addEventListener('blur', autocompletarTasaMensual);
+    inputFechaElemento.addEventListener('change', () => marcharCambioCategoria(false));
+    inputFechaElemento.addEventListener('input', () => marcharCambioCategoria(false));
+    inputFechaElemento.addEventListener('blur', () => marcharCambioCategoria(false));
 
-    // Evento de escucha al cambiar de categoría
     document.getElementById('tipo_ingreso').addEventListener('change', () => marcharCambioCategoria(true));
     
-    autocompletarTasaMensual();
     marcharCambioCategoria(false);
     actualizarInterfaz();
   </script>
-  <!-- Cloudflare Web Analytics --><script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "009e8b6e3c794e5791ba522bfe4962d2"}'></script><!-- End Cloudflare Web Analytics -->
-</body>
+  <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "009e8b6e3c794e5791ba522bfe4962d2"}'></script></body>
 </html>
