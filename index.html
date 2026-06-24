@@ -15,7 +15,7 @@
   <link rel="manifest" href="manifest.json">
   <link rel="apple-touch-icon" href="icons/app-icon.png">
 
-  <title>Mis pagos</title>
+  <title>Mis pagos y Gastos</title>
   
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
   <link rel="stylesheet" type="text/css" href="https://cdn.jsdelivr.net/npm/toastify-js/src/toastify.min.css">
@@ -28,12 +28,19 @@
       --import: #0277bd;
       --danger: #d32f2f;
       --warning: #f39c12;
-      --vacaciones: #6a1b9a;
       --cesta: #009688;
+      --vacaciones: #e91e63;
       --anual: #1a1a2e;
       --general: #455a64;
       --bg: #f0f2f5;
       --radius: 15px;
+      
+      --g-alimentos: #e53935;
+      --g-ahorro: #2e7d32; 
+      --g-servicios: #fb8c00;
+      --g-transporte: #8e24aa;
+      --g-salud: #00acc1;
+      --g-otros: #5c6bc0;
     }
 
     body { 
@@ -49,12 +56,18 @@
 
     * { -webkit-tap-highlight-color: transparent; }
 
-    .header-container { text-align: center; padding: 20px 0 10px 0; }
+    .header-container { text-align: center; padding: 15px 0 5px 0; }
     .header-container h1 { margin: 0; font-size: 1.6rem; color: var(--primary); font-weight: 800; letter-spacing: -0.5px; }
     .header-container span { display: block; margin-top: 5px; font-size: 0.8rem; color: #666; font-weight: 500; }
-    .top-bar { width: 40px; height: 4px; background: var(--primary); margin: 0 auto 12px; border-radius: 10px; }
+    .top-bar { width: 40px; height: 4px; background: var(--primary); margin: 0 auto 10px; border-radius: 10px; transition: background 0.3s; }
     
+    .tab-bar { display: flex; background: #e4e6eb; padding: 4px; border-radius: 12px; margin-bottom: 15px; }
+    .tab-btn { flex: 1; padding: 12px; font-size: 0.9rem; font-weight: bold; background: transparent; color: #555; border: none; border-radius: 10px; transition: all 0.2s ease; cursor: pointer; display: flex; justify-content: center; align-items: center; gap: 6px; }
+    .tab-btn.active { background: white; color: var(--primary); box-shadow: 0 2px 6px rgba(0,0,0,0.1); }
+    .tab-bar.modo-gastos .tab-btn.active { color: var(--danger); }
+
     .card { background: white; padding: 15px; border-radius: var(--radius); box-shadow: 0 4px 12px rgba(0,0,0,0.08); margin-bottom: 15px; }
+    
     .resumen-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 15px; }
     .stat-box { background: white; padding: 12px; border-radius: var(--radius); text-align: center; border-top: 4px solid #ddd; }
     .full-width { grid-column: span 2; }
@@ -67,6 +80,8 @@
     .border-pres { border-top-color: var(--import); }
     .border-vaca { border-top-color: var(--vacaciones); }
     .border-cesta { border-top-color: var(--cesta); }
+    .border-gastos { border-top-color: var(--danger); }
+    .border-balance { border-top-color: var(--excel); }
 
     .comparativa-usd { display: flex; justify-content: center; gap: 8px; font-size: 0.9rem; font-weight: bold; }
     .u-ofic { color: var(--import); }
@@ -101,6 +116,7 @@
       touch-action: manipulation;
     }
     .btn-main { background: var(--primary); color: white; }
+    .btn-danger { background: var(--danger); color: white; }
 
     .meta-card { background: #fff; border-left: 5px solid var(--excel); margin-top: 5px; }
     .meta-header { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
@@ -110,7 +126,7 @@
     .progress-fill { background: var(--excel); height: 100%; width: 0%; transition: width 0.5s; }
     .meta-footer { display: flex; justify-content: space-between; margin-top: 6px; font-size: 0.7rem; color: #666; font-weight: bold; }
 
-    .chart-container { height: 250px; width: 100%; margin-top: 10px; }
+    .chart-container { height: 230px; width: 100%; margin-top: 10px; }
     .table-container { overflow-x: auto; margin-top: 10px; -webkit-overflow-scrolling: touch; }
     table { width: 100%; border-collapse: collapse; font-size: 0.75rem; }
     th { background: #f4f6f8; padding: 8px; text-align: left; white-space: nowrap; }
@@ -122,10 +138,18 @@
     .tag-prestaciones { background: var(--import); }
     .tag-vacaciones { background: var(--vacaciones); }
     .tag-cestaticket { background: var(--cesta); }
+    
+    .tag-alimentos { background: var(--g-alimentos); }
+    .tag-ahorro { background: var(--g-ahorro); }
+    .tag-servicios { background: var(--g-servicios); }
+    .tag-transporte { background: var(--g-transporte); }
+    .tag-salud { background: var(--g-salud); }
+    .tag-otros { background: var(--g-otros); }
 
     .acciones-btn { background: #f0f2f5; width: 32px; height: 32px; border-radius: 6px; border: none; display: inline-flex; justify-content: center; align-items: center; font-size: 0.9rem; }
 
     summary { font-weight: bold; color: var(--primary); cursor: pointer; padding: 5px 0; }
+    .summary-gastos { color: var(--danger) !important; }
     
     .tasas-row { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-bottom: 10px; }
 
@@ -155,14 +179,19 @@
 <body>
 
   <div class="header-container">
-    <div class="top-bar"></div>
-    <h1>MIS PAGOS</h1>
+    <div class="top-bar" id="app-top-bar"></div>
+    <h1 id="app-title">MIS PAGOS</h1>
     <span>Control Financiero Personal</span>
   </div>
 
+  <div class="tab-bar">
+    <button class="tab-btn active" onclick="cambiarPestaña('ingresos')">💰 Ingresos</button>
+    <button class="tab-btn" onclick="cambiarPestaña('gastos')">💸 Gastos</button>
+  </div>
+
   <div class="resumen-grid">
-    <div class="stat-box full-width border-sueldo">
-      <h4>Sueldo Mes Actual</h4>
+    <div class="stat-box full-width border-sueldo" id="card-principal-resumen">
+      <h4 id="label-principal-resumen">Sueldo Mes Actual</h4>
       <div class="valor" id="suma-bs">0.00 Bs</div>
       <div class="comparativa-usd">
         <span class="u-ofic" id="sueldo-usd-of">0.00 $ BCV</span>
@@ -170,32 +199,41 @@
       </div>
     </div>
 
-    <div class="stat-box border-util">
+    <div class="stat-box full-width border-balance" id="card-balance" style="display: none;">
+      <h4>Balance Neto Disponible (Mes)</h4>
+      <div class="valor" id="balance-bs" style="color: var(--excel);">0.00 Bs</div>
+      <div class="comparativa-usd">
+        <span class="u-ofic" id="balance-usd-of">0.00 $ BCV</span>
+        <span class="u-par" id="balance-usd-pa">0.00 $ Par.</span>
+      </div>
+    </div>
+
+    <div class="stat-box border-util bloque-ingresos-only">
       <h4>Utilidades</h4>
       <div class="valor" id="total-util">0.00 Bs</div>
       <div class="comparativa-usd"><span class="u-ofic" id="util-of">0$</span> | <span class="u-par" id="util-pa">0$</span></div>
     </div>
 
-    <div class="stat-box border-pres">
+    <div class="stat-box border-pres bloque-ingresos-only">
       <h4>Prestaciones</h4>
       <div class="valor" id="total-pres">0.00 Bs</div>
       <div class="comparativa-usd"><span class="u-ofic" id="pres-of">0$</span> | <span class="u-par" id="pres-pa">0$</span></div>
     </div>
 
-    <div class="stat-box border-vaca">
+    <div class="stat-box border-vaca bloque-ingresos-only">
       <h4>Vacaciones</h4>
       <div class="valor" id="total-vaca">0.00 Bs</div>
       <div class="comparativa-usd"><span class="u-ofic" id="vaca-of">0$</span> | <span class="u-par" id="vaca-pa">0$</span></div>
     </div>
 
-    <div class="stat-box border-cesta">
+    <div class="stat-box border-cesta bloque-ingresos-only">
       <h4>Cesta Ticket</h4>
       <div class="valor" id="total-cest">0.00 Bs</div>
       <div class="comparativa-usd"><span class="u-ofic" id="cest-of">0$</span> | <span class="u-par" id="cest-pa">0$</span></div>
     </div>
 
-    <div class="stat-box full-width" style="background: var(--anual); color:white; border:none; margin-bottom: 5px;">
-      <h4 style="color: #aaa;">📊 ACUMULADO (SIN CESTA)</h4>
+    <div class="stat-box full-width bloque-ingresos-only" style="background: var(--anual); color:white; border:none; margin-bottom: 5px;">
+      <h4 style="color: #aaa;">📊 ACUMULADO INGRESOS (SIN CESTA)</h4>
       <div class="valor" style="color:white; font-size: 1.1rem;" id="anual-total-bs">0.00 Bs</div>
       <div class="comparativa-usd">
         <span style="color: #4fc3f7;" id="anual-usd-of">0$ BCV</span>
@@ -203,8 +241,8 @@
       </div>
     </div>
 
-    <div class="stat-box full-width" style="background: var(--general); color:white; border:none;">
-      <h4 style="color: #cfd8dc;">💎 TOTAL GENERAL (INC. CESTA)</h4>
+    <div class="stat-box full-width bloque-ingresos-only" style="background: var(--general); color:white; border:none;">
+      <h4 style="color: #cfd8dc;">💎 TOTAL GENERAL INGRESOS (INC. CESTA)</h4>
       <div class="valor" style="color:#81d4fa; font-size: 1.3rem;" id="general-total-bs">0.00 Bs</div>
       <div class="comparativa-usd">
         <span style="color: #fff;" id="general-usd-of">0.00 $ BCV</span>
@@ -212,7 +250,7 @@
       </div>
     </div>
 
-    <div class="card full-width meta-card">
+    <div class="card full-width meta-card bloque-ingresos-only">
       <div class="meta-header">
         <label style="margin:0; font-size: 0.8rem; color: #555;">🎯 META DE AHORRO PERSONAL</label>
         <div class="meta-edit" onclick="editarMetaManual()">GESTIONAR</div>
@@ -228,57 +266,112 @@
     </div>
   </div>
 
-  <div class="card">
-    <label>📅 Fecha de Pago</label>
-    <input type="date" id="fecha">
-    
-    <label>📂 Categoría</label>
-    <select id="tipo_ingreso">
-      <option value="Sueldo">Sueldo Semanal</option>
-      <option value="Cestaticket">Cesta Ticket</option>
-      <option value="Utilidades">Utilidades</option>
-      <option value="Prestaciones">Prestaciones</option>
-      <option value="Vacaciones">Vacaciones</option>
-    </select>
-    
-    <div id="registro-tasas" class="tasas-row">
-      <div><label>💵 Tasa BCV</label><input type="number" id="tasa_registro_of" inputmode="decimal" placeholder="0.00" step="0.01"></div>
-      <div><label>🔥 Tasa Par.</label><input type="number" id="tasa_registro_pa" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+  <div id="seccion-ingresos">
+    <div class="card">
+      <label>📅 Fecha de Pago</label>
+      <input type="date" id="fecha">
+      
+      <label>📂 Categoría</label>
+      <select id="tipo_ingreso">
+        <option value="Sueldo">Sueldo Semanal</option>
+        <option value="Cestaticket">Cesta Ticket</option>
+        <option value="Vacaciones">Vacaciones</option>
+        <option value="Utilidades">Utilidades</option>
+        <option value="Prestaciones">Prestaciones</option>
+      </select>
+      
+      <div class="tasas-row">
+        <div><label>💵 Tasa BCV</label><input type="number" id="tasa_registro_of" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+        <div><label>🔥 Tasa Par.</label><input type="number" id="tasa_registro_pa" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+      </div>
+
+      <label>💰 Monto en Bolívares</label>
+      <input type="number" id="monto_bs" inputmode="decimal" placeholder="0.00" step="0.01">
+      
+      <button class="btn-main" onclick="agregarSemana()">Registrar Pago</button>
     </div>
 
-    <label>💰 Monto en Bolívares</label>
-    <input type="number" id="monto_bs" inputmode="decimal" placeholder="0.00" step="0.01">
-    
-    <button class="btn-main" onclick="agregarSemana()">Registrar Pago</button>
+    <div class="card">
+      <summary style="list-style: none; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 Histórico de Sueldo Mensual</summary>
+      <div class="chart-container"><canvas id="graficoMensual"></canvas></div>
+    </div>
+
+    <details class="card" open>
+      <summary>📋 Historial de Pagos y Respaldo</summary>
+      <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <div><label>Desde:</label><input type="date" id="filtro-desde" onchange="actualizarInterfaz()"></div>
+        <div><label>Hasta:</label><input type="date" id="filtro-hasta" onchange="actualizarInterfaz()"></div>
+      </div>
+      <button style="background: var(--general); font-size: 0.7rem; padding: 8px; margin-bottom: 10px;" onclick="limpiarFiltros()">Limpiar Filtros</button>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Tipo</th><th>Bs</th><th>$ BCV</th><th>$ Par.</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="tabla-body"></tbody>
+        </table>
+      </div>
+    </details>
   </div>
 
-  <div class="card">
-    <summary style="list-style: none; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">📈 Histórico de Sueldo Mensual</summary>
-    <div class="chart-container"><canvas id="graficoMensual"></canvas></div>
+  <div id="seccion-gastos" style="display: none;">
+    <div class="card" style="border-left: 5px solid var(--danger);">
+      <label>📅 Fecha del Gasto</label>
+      <input type="date" id="gasto_fecha">
+      
+      <label>📂 Categoría del Gasto</label>
+      <select id="gasto_categoria">
+        <option value="Alimentos">Alimentos / Supermercado</option>
+        <option value="Ahorro">🎯 Ahorro / Compra de Dólares</option>
+        <option value="Servicios">Servicios (Luz, Internet)</option>
+        <option value="Transporte">Transporte / Repuestos</option>
+        <option value="Salud">Salud / Farmacia</option>
+        <option value="Otros">Otros Gastos</option>
+      </select>
+      
+      <div class="tasas-row">
+        <div><label>💵 Tasa BCV</label><input type="number" id="gasto_tasa_of" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+        <div><label>🔥 Tasa Par.</label><input type="number" id="gasto_tasa_pa" inputmode="decimal" placeholder="0.00" step="0.01"></div>
+      </div>
+
+      <label>💸 Monto en Bolívares</label>
+      <input type="number" id="gasto_monto_bs" inputmode="decimal" placeholder="0.00" step="0.01">
+      
+      <button class="btn-danger" onclick="agregarGasto()">Registrar Gasto</button>
+    </div>
+
+    <div class="card">
+      <summary class="summary-gastos" style="list-style: none; font-size: 0.85rem; text-transform: uppercase; letter-spacing: 0.5px;">📉 Distribución Mensual de Gastos</summary>
+      <div class="chart-container"><canvas id="graficoGastos"></canvas></div>
+    </div>
+
+    <details class="card" open>
+      <summary class="summary-gastos">📋 Historial de Gastos Ejecutados</summary>
+      <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
+        <div><label>Desde:</label><input type="date" id="gasto-filtro-desde" onchange="actualizarInterfaz()"></div>
+        <div><label>Hasta:</label><input type="date" id="gasto-filtro-hasta" onchange="actualizarInterfaz()"></div>
+      </div>
+      <button style="background: var(--general); font-size: 0.7rem; padding: 8px; margin-bottom: 10px;" onclick="limpiarFiltrosGastos()">Limpiar Filtros</button>
+
+      <div class="table-container">
+        <table>
+          <thead>
+            <tr><th>Fecha</th><th>Categoría</th><th>Bs</th><th>$ BCV</th><th>$ Par.</th><th>Acción</th></tr>
+          </thead>
+          <tbody id="gasto-tabla-body"></tbody>
+        </table>
+      </div>
+    </details>
   </div>
 
-  <details class="card" open>
-    <summary>📋 Historial de Pagos y Respaldo</summary>
-    
-    <div class="tasas-row" style="margin-top: 15px; border-bottom: 1px solid #eee; padding-bottom: 10px;">
-      <div><label>Desde:</label><input type="date" id="filtro-desde" onchange="actualizarInterfaz()"></div>
-      <div><label>Hasta:</label><input type="date" id="filtro-hasta" onchange="actualizarInterfaz()"></div>
-    </div>
-    <button style="background: var(--general); font-size: 0.7rem; padding: 8px; margin-bottom: 10px;" onclick="limpiarFiltros()">Limpiar Filtros</button>
-
-    <div class="table-container">
-      <table>
-        <thead>
-          <tr><th>Fecha</th><th>Tipo</th><th>Bs</th><th>$ BCV</th><th>$ Par.</th><th>Acción</th></tr>
-        </thead>
-        <tbody id="tabla-body"></tbody>
-      </table>
-    </div>
-    <button style="background:var(--excel); color:white; margin-top:15px;" onclick="exportarTodo()">⬇️ Exportar Respaldo Total</button>
+  <div class="card" style="background: #fafafa; border: 1px dashed #ccc; margin-top: 20px;">
+    <label style="color:#555; font-size:0.8rem; text-align:center; display:block;">⚙️ ADMINISTRACIÓN DE RESPALDOS GLOBALES</label>
+    <button style="background:var(--excel); color:white; margin-top:10px; font-size:0.85rem;" onclick="exportarTodo()">⬇️ Exportar Base de Datos Completa</button>
     <input type="file" id="file-input" style="display:none;" accept=".csv,text/csv,.txt" onchange="importarTodo(this)">
-    <button style="background:var(--import); color:white; margin-top:10px;" onclick="document.getElementById('file-input').click();">📂 Importar Respaldo Total</button>
-    <button style="background:var(--danger); color:white; margin-top:10px;" onclick="limpiarTodo()">🗑️ Borrar Todo</button>
-  </details>
+    <button style="background:var(--import); color:white; margin-top:10px; font-size:0.85rem;" onclick="document.getElementById('file-input').click();">📂 Importar Base de Datos Completa</button>
+    <button style="background:var(--danger); color:white; margin-top:10px; font-size:0.85rem;" onclick="limpiarTodo()">🗑️ Borrar Todo el Almacenamiento</button>
+  </div>
 
   <div id="custom-modal" class="modal-overlay" style="display:none;">
     <div class="modal-content">
@@ -296,27 +389,66 @@
     const NOMBRES_MESES = ["Ene","Feb","Mar","Abr","May","Jun","Jul","Ago","Sep","Oct","Nov","Dic"];
     
     let chartInstance = null;
+    let chartGastosInstance = null;
+    let vistaActual = 'ingresos';
+
     let semanas = JSON.parse(localStorage.getItem('pagosSemanales')) || [];
+    let gastos = JSON.parse(localStorage.getItem('gastosPersonales')) || [];
     let metaAhorro = parseFloat(localStorage.getItem('metaAhorro')) || 0;
     let ahorroRecaudado = parseFloat(localStorage.getItem('ahorroRecaudado')) || 0;
 
     let tasaBcvApiDelDia = null;
     let tasaParaleloApiDelDia = null;
 
-    // Auto-curación limpia
+    // Migración interna segura de datos antiguos
     let huboMigracion = false;
     semanas.forEach(s => {
-      if (!s.tasa_sem_of && (s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of)) {
-        s.tasa_sem_of = parseFloat(s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of);
-        huboMigracion = true;
-      }
-      if (!s.tasa_sem_pa && (s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa)) {
-        s.tasa_sem_pa = parseFloat(s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa);
-        huboMigracion = true;
-      }
+      if (!s.tasa_sem_of && (s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of)) { s.tasa_sem_of = parseFloat(s.tasa_bcv || s.tasa_ofic || s.tasa_registro_of); huboMigracion = true; }
+      if (!s.tasa_sem_pa && (s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa)) { s.tasa_sem_pa = parseFloat(s.tasa_paralelo || s.tasa_pa || s.tasa_registro_pa); huboMigracion = true; }
     });
-    if (huboMigracion) {
-      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+    if (huboMigracion) localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+
+    function cambiarPestaña(vista) {
+      vistaActual = vista;
+      const btnIngresos = document.querySelectorAll('.tab-btn')[0];
+      const btnGastos = document.querySelectorAll('.tab-btn')[1];
+      const tabBar = document.querySelector('.tab-bar');
+      const topBar = document.getElementById('app-top-bar');
+      const appTitle = document.getElementById('app-title');
+      const cResumen = document.getElementById('card-principal-resumen');
+      const lResumen = document.getElementById('label-principal-resumen');
+      const cardBalance = document.getElementById('card-balance');
+      const bloquesIngresos = document.querySelectorAll('.bloque-ingresos-only');
+
+      if (vista === 'ingresos') {
+        btnIngresos.classList.add('active');
+        btnGastos.classList.remove('active');
+        tabBar.classList.remove('modo-gastos');
+        topBar.style.background = 'var(--primary)';
+        appTitle.textContent = 'MIS PAGOS';
+        appTitle.style.color = 'var(--primary)';
+        cResumen.className = "stat-box full-width border-sueldo";
+        lResumen.textContent = "Sueldo Mes Actual";
+        cardBalance.style.display = 'none';
+        bloquesIngresos.forEach(b => b.style.display = 'block');
+      } else {
+        btnIngresos.classList.remove('active');
+        btnGastos.classList.add('active');
+        tabBar.classList.add('modo-gastos');
+        topBar.style.background = 'var(--danger)';
+        appTitle.textContent = 'MIS GASTOS';
+        appTitle.style.color = 'var(--danger)';
+        cResumen.className = "stat-box full-width border-gastos";
+        lResumen.textContent = "Gastos Mes Actual";
+        cardBalance.style.display = 'block';
+        bloquesIngresos.forEach(b => b.style.display = 'none');
+      }
+
+      document.getElementById('seccion-ingresos').style.display = vista === 'ingresos' ? 'block' : 'none';
+      document.getElementById('seccion-gastos').style.display = vista === 'gastos' ? 'block' : 'none';
+      
+      marcharCambioCategoria(false);
+      actualizarInterfaz();
     }
 
     let currentCallback = null;
@@ -324,47 +456,30 @@
       document.getElementById('modal-message').innerText = mensaje;
       const input = document.getElementById('modal-input');
       const btnCancel = document.getElementById('btn-cancel');
-      input.style.display = 'block';
-      btnCancel.style.display = 'block';
+      input.style.display = 'block'; btnCancel.style.display = 'block';
       if(tipo === 'alert') { input.style.display = 'none'; btnCancel.style.display = 'none'; }
       else if(tipo === 'confirm') { input.style.display = 'none'; }
-      else { 
-        input.type = tipo; 
-        input.value = valorDefecto; 
-        if (tipo === 'number') input.step = 'any';
-      }
+      else { input.type = tipo; input.value = valorDefecto; if (tipo === 'number') input.step = 'any'; }
       document.getElementById('custom-modal').style.display = 'flex';
       currentCallback = callback;
     }
-
+    
     function confirmModal() {
       const input = document.getElementById('modal-input');
       const val = input.style.display === 'none' ? true : input.value;
-      const callbackARecordar = currentCallback;
-      closeModal();
-      if (callbackARecordar) callbackARecordar(val);
+      const cb = currentCallback; closeModal(); if (cb) cb(val);
     }
-
-    function closeModal() { 
-      document.getElementById('custom-modal').style.display = 'none';
-      currentCallback = null;
-    }
-
+    function closeModal() { document.getElementById('custom-modal').style.display = 'none'; currentCallback = null; }
     function formatear(n) { return new Intl.NumberFormat('es-VE').format(n); }
 
     function editarMetaManual() {
-      customPrompt("¿Cuánto has recaudado hasta hoy ($)?", ahorroRecaudado, "number", (montoRec) => {
+      customPrompt("¿Cuánto has recaudado manualmente en total hoy ($)?", ahorroRecaudado, "number", (montoRec) => {
         const rec = parseFloat(montoRec);
         if(!isNaN(rec)) {
-          ahorroRecaudado = rec;
-          localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+          ahorroRecaudado = rec; localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
           customPrompt("¿Cuál es tu meta final ($)?", metaAhorro, "number", (montoMeta) => {
             const met = parseFloat(montoMeta);
-            if(!isNaN(met) && met >= 0) {
-              metaAhorro = met;
-              localStorage.setItem('metaAhorro', metaAhorro);
-              actualizarInterfaz();
-            }
+            if(!isNaN(met) && met >= 0) { metaAhorro = met; localStorage.setItem('metaAhorro', metaAhorro); actualizarInterfaz(); }
           });
         }
       });
@@ -375,28 +490,55 @@
       const mAct = hoy.getMonth();
       const aAct = hoy.getFullYear();
 
-      const filtMes = semanas.filter(s => {
-        const d = new Date(s.fecha + "T00:00:00");
-        return d.getMonth() === mAct && d.getFullYear() === aAct;
-      });
-
       const calcTotal = (lista) => lista.reduce((a, b) => a + b.monto_bs, 0);
       const calcUSD = (lista, tipoTasa = 'of') => lista.reduce((acc, s) => {
         let tF = tipoTasa === 'of' ? s.tasa_sem_of : s.tasa_sem_pa;
         return acc + (s.monto_bs / (tF || 1));
       }, 0);
 
-      const sueldosMes = filtMes.filter(s => s.tipo === 'Sueldo' || !s.tipo);
-      document.getElementById('suma-bs').textContent = formatear(calcTotal(sueldosMes).toFixed(2)) + " Bs";
-      document.getElementById('sueldo-usd-of').textContent = formatear(calcUSD(sueldosMes, 'of').toFixed(2)) + " $ BCV";
-      document.getElementById('sueldo-usd-pa').textContent = formatear(calcUSD(sueldosMes, 'pa').toFixed(2)) + " $ Par.";
+      const filtMesIngresos = semanas.filter(s => {
+        const d = new Date(s.fecha + "T00:00:00");
+        return d.getMonth() === mAct && d.getFullYear() === aAct;
+      });
+      const sueldosMes = filtMesIngresos.filter(s => s.tipo === 'Sueldo' || !s.tipo);
+
+      const filtMesGastos = gastos.filter(g => {
+        const d = new Date(g.fecha + "T00:00:00");
+        return d.getMonth() === mAct && d.getFullYear() === aAct;
+      });
+
+      if(vistaActual === 'ingresos') {
+        document.getElementById('suma-bs').textContent = formatear(calcTotal(sueldosMes).toFixed(2)) + " Bs";
+        document.getElementById('sueldo-usd-of').textContent = formatear(calcUSD(sueldosMes, 'of').toFixed(2)) + " $ BCV";
+        document.getElementById('sueldo-usd-pa').textContent = formatear(calcUSD(sueldosMes, 'pa').toFixed(2)) + " $ Par.";
+      } else {
+        document.getElementById('suma-bs').textContent = formatear(calcTotal(filtMesGastos).toFixed(2)) + " Bs";
+        document.getElementById('sueldo-usd-of').textContent = formatear(calcUSD(filtMesGastos, 'of').toFixed(2)) + " $ BCV";
+        document.getElementById('sueldo-usd-pa').textContent = formatear(calcUSD(filtMesGastos, 'pa').toFixed(2)) + " $ Par.";
+      }
+
+      const totalSueldoBs = calcTotal(sueldosMes);
+      const totalGastoBs = calcTotal(filtMesGastos);
+      const balanceBs = totalSueldoBs - totalGastoBs;
+      const balanceUsdOf = calcUSD(sueldosMes, 'of') - calcUSD(filtMesGastos, 'of');
+      const balanceUsdPa = calcUSD(sueldosMes, 'pa') - calcUSD(filtMesGastos, 'pa');
+
+      const elBalBs = document.getElementById('balance-bs');
+      elBalBs.textContent = formatear(balanceBs.toFixed(2)) + " Bs";
+      elBalBs.style.color = balanceBs >= 0 ? "var(--excel)" : "var(--danger)";
+      document.getElementById('balance-usd-of').textContent = formatear(balanceUsdOf.toFixed(2)) + " $ BCV";
+      document.getElementById('balance-usd-pa').textContent = formatear(balanceUsdPa.toFixed(2)) + " $ Par.";
 
       ['Utilidades', 'Prestaciones', 'Vacaciones', 'Cestaticket'].forEach(cat => {
         const items = semanas.filter(s => s.tipo === cat); 
-        const id = cat.substring(0,4).toLowerCase();
-        document.getElementById(`total-${id}`).textContent = formatear(calcTotal(items).toFixed(2)) + " Bs";
-        document.getElementById(`${id}-of`).textContent = formatear(calcUSD(items, 'of').toFixed(2)) + "$";
-        document.getElementById(`${id}-pa`).textContent = formatear(calcUSD(items, 'pa').toFixed(2)) + "$";
+        let id = cat.substring(0,4).toLowerCase();
+        if(cat === 'Vacaciones') id = 'vaca';
+        if(cat === 'Cestaticket') id = 'cest';
+
+        const el = document.getElementById(`total-${id}`);
+        if(el) el.textContent = formatear(calcTotal(items).toFixed(2)) + " Bs";
+        const elOf = document.getElementById(`${id}-of`); if(elOf) elOf.textContent = formatear(calcUSD(items, 'of').toFixed(2)) + "$";
+        const elPa = document.getElementById(`${id}-pa`); if(elPa) elPa.textContent = formatear(calcUSD(items, 'pa').toFixed(2)) + "$";
       });
 
       const semSinCesta = semanas.filter(s => s.tipo !== 'Cestaticket');
@@ -408,70 +550,123 @@
       document.getElementById('general-usd-of').textContent = formatear(calcUSD(semanas, 'of').toFixed(2)) + " $ BCV";
       document.getElementById('general-usd-pa').textContent = formatear(calcUSD(semanas, 'pa').toFixed(2)) + " $ Par.";
 
-      let porcentaje = 0;
-      if(metaAhorro > 0) porcentaje = Math.min((ahorroRecaudado / metaAhorro) * 100, 100);
-      document.getElementById('meta-display').textContent = `${formatear(ahorroRecaudado)} $ / ${formatear(metaAhorro)} $`;
+      // Sincronización robusta de la meta (Evita descalces por borrados)
+      const ahorroDesdeGastos = gastos.filter(g => g.categoria === 'Ahorro').reduce((sum, g) => sum + (g.usd_real_meta || 0), 0);
+      let totalMetaRecaudado = ahorroRecaudado > 0 ? ahorroRecaudado : ahorroDesdeGastos;
+
+      let porcentaje = 0; if(metaAhorro > 0) porcentaje = Math.min((totalMetaRecaudado / metaAhorro) * 100, 100);
+      document.getElementById('meta-display').textContent = `${formatear(totalMetaRecaudado)} $ / ${formatear(metaAhorro)} $`;
       document.getElementById('meta-progreso').style.width = porcentaje + "%";
       document.getElementById('meta-porcentaje').textContent = `${porcentaje.toFixed(1)}% de la meta`;
-      const faltante = Math.max(metaAhorro - ahorroRecaudado, 0);
+      const faltante = Math.max(metaAhorro - totalMetaRecaudado, 0);
       document.getElementById('meta-restante').textContent = `Faltan: ${formatear(faltante.toFixed(2))} $`;
 
-      const desde = document.getElementById('filtro-desde').value;
-      const hasta = document.getElementById('filtro-hasta').value;
-      
-      let semanasFiltradas = semanas.map((s, idx) => ({ ...s, idxOriginal: idx }));
+      // Renderizado de tabla Ingresos con indexación limpia
+      const desdeI = document.getElementById('filtro-desde').value;
+      const hastaI = document.getElementById('filtro-hasta').value;
+      let semFiltradas = semanas.map((s, idx) => ({ ...s, idxOriginal: idx }));
+      if (desdeI) semFiltradas = semFiltradas.filter(s => s.fecha >= desdeI);
+      if (hastaI) semFiltradas = semFiltradas.filter(s => s.fecha <= hastaI);
 
-      if (desde || hasta) {
-        semanasFiltradas = semanasFiltradas.filter(s => {
-          if (desde && s.fecha < desde) return false;
-          if (hasta && s.fecha > hasta) return false;
-          return true;
-        });
-      }
-
-      const tbody = document.getElementById('tabla-body');
-      tbody.innerHTML = semanasFiltradas.slice().reverse().map((s) => {
+      document.getElementById('tabla-body').innerHTML = semFiltradas.slice().reverse().map(s => {
         const d = new Date(s.fecha + "T00:00:00");
-        const tOf = s.tasa_sem_of || 1;
-        const tPa = s.tasa_sem_pa || 1;
-
         return `<tr><td><strong>${NOMBRES_DIAS[d.getDay()]}</strong><br>${s.fecha.split('-').reverse().slice(0,2).join('/')}</td>
           <td><span class="tag tag-${(s.tipo || 'Sueldo').toLowerCase()}">${s.tipo || 'Sueldo'}</span></td>
           <td style="font-weight:bold;">${formatear(s.monto_bs)}</td>
-          <td style="color:var(--import); font-weight:500;" title="Tasa: ${tOf}">${(s.monto_bs / tOf).toFixed(2)}$</td>
-          <td style="color:var(--danger); font-weight:500;" title="Tasa: ${tPa}">${(s.monto_bs / tPa).toFixed(2)}$</td>
+          <td style="color:var(--import); font-weight:500;">${(s.monto_bs / (s.tasa_sem_of||1)).toFixed(2)}$</td>
+          <td style="color:var(--danger); font-weight:500;">${(s.monto_bs / (s.tasa_sem_pa||1)).toFixed(2)}$</td>
           <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarReg(${s.idxOriginal})">✏️</button>
           <button class="acciones-btn" style="color:red;" onclick="borrarReg(${s.idxOriginal})">✖</button></div></td></tr>`;
       }).join('');
+
+      // Renderizado de tabla Gastos con indexación limpia
+      const desdeG = document.getElementById('gasto-filtro-desde').value;
+      const hastaG = document.getElementById('gasto-filtro-hasta').value;
+      let gastFiltrados = gastos.map((g, idx) => ({ ...g, idxOriginal: idx }));
+      if (desdeG) gastFiltrados = gastFiltrados.filter(g => g.fecha >= desdeG);
+      if (hastaG) gastFiltrados = gastFiltrados.filter(g => g.fecha <= hastaG);
+
+      document.getElementById('gasto-tabla-body').innerHTML = gastFiltrados.slice().reverse().map(g => {
+        const d = new Date(g.fecha + "T00:00:00");
+        return `<tr><td><strong>${NOMBRES_DIAS[d.getDay()]}</strong><br>${g.fecha.split('-').reverse().slice(0,2).join('/')}</td>
+          <td><span class="tag tag-${g.categoria.toLowerCase()}">${g.categoria === 'Ahorro' ? '🎯 Ahorro' : g.categoria}</span></td>
+          <td style="font-weight:bold; color:var(--danger);">${formatear(g.monto_bs)}</td>
+          <td style="color:var(--import); font-weight:500;">${(g.monto_bs / (g.tasa_sem_of||1)).toFixed(2)}$</td>
+          <td style="color:var(--danger); font-weight:500;">${g.categoria === 'Ahorro' && g.usd_real_meta ? g.usd_real_meta.toFixed(2) + '$ Netos' : (g.monto_bs / (g.tasa_sem_pa||1)).toFixed(2) + '$'}</td>
+          <td><div style="display:flex; gap:4px;"><button class="acciones-btn" onclick="editarGastoReg(${g.idxOriginal})">✏️</button>
+          <button class="acciones-btn" style="color:red;" onclick="borrarGastoReg(${g.idxOriginal})">✖</button></div></td></tr>`;
+      }).join('');
       
       actualizarGrafico();
+      actualizarGraficoGastos();
+    }
+
+    function marcharCambioCategoria(mostrarAlerta = true) {
+      const inputBCV = document.getElementById(vistaActual === 'ingresos' ? 'tasa_registro_of' : 'gasto_tasa_of');
+      const inputPar = document.getElementById(vistaActual === 'ingresos' ? 'tasa_registro_pa' : 'gasto_tasa_pa');
+      
+      if (!inputBCV || !inputPar) return;
+
+      if (tasaBcvApiDelDia && tasaParaleloApiDelDia) {
+        inputBCV.value = tasaBcvApiDelDia.toFixed(2); inputBCV.style.backgroundColor = "#e0f2f1";
+        inputPar.value = tasaParaleloApiDelDia.toFixed(2); inputPar.style.backgroundColor = "#ffebee";
+        return;
+      }
+
+      inputBCV.placeholder = "Cargando..."; inputPar.placeholder = "Cargando...";
+      inputBCV.style.backgroundColor = "#fff9c4"; inputPar.style.backgroundColor = "#fff9c4";
+
+      fetch('https://ve.dolarapi.com/v1/dolares/oficial')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.promedio) {
+            tasaBcvApiDelDia = parseFloat(data.promedio);
+            inputBCV.value = tasaBcvApiDelDia.toFixed(2); inputBCV.style.backgroundColor = "#e0f2f1"; 
+            if (mostrarAlerta) Toastify({ text: `💵 BCV Real: ${tasaBcvApiDelDia.toFixed(2)}`, duration: 2000, style: { background: "#0277bd", borderRadius: "10px" } }).showToast();
+          }
+        }).catch(() => { inputBCV.placeholder = "0.00"; inputBCV.style.backgroundColor = "white"; });
+
+      fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
+        .then(res => res.json())
+        .then(data => {
+          if (data && data.promedio) {
+            tasaParaleloApiDelDia = parseFloat(data.promedio);
+            inputPar.value = tasaParaleloApiDelDia.toFixed(2); inputPar.style.backgroundColor = "#ffebee"; 
+            if (mostrarAlerta) Toastify({ text: `🔥 Paralelo Real: ${tasaParaleloApiDelDia.toFixed(2)}`, duration: 2000, style: { background: "#d32f2f", borderRadius: "10px" } }).showToast();
+          }
+        }).catch(() => { inputPar.placeholder = "0.00"; inputPar.style.backgroundColor = "white"; });
+    }
+
+    function agregarSemana() {
+      const f = document.getElementById('fecha').value;
+      const m = parseFloat(document.getElementById('monto_bs').value);
+      const t = document.getElementById('tipo_ingreso').value;
+      const tOf = parseFloat(document.getElementById('tasa_registro_of').value);
+      const tPa = parseFloat(document.getElementById('tasa_registro_pa').value);
+      
+      if(!f || isNaN(m) || isNaN(tOf) || isNaN(tPa)) return customPrompt("Por favor ingresa todos los campos", "", "alert");
+      
+      semanas.push({ fecha: f, monto_bs: m, tipo: t, tasa_sem_of: tOf, tasa_sem_pa: tPa }); 
+      semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
+      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+      
+      document.getElementById('monto_bs').value = ""; 
+      Toastify({ text: `✅ ${t} registrado`, duration: 2500, style: { background: "linear-gradient(to right, #0f3460, #2e7d32)", borderRadius: "10px" } }).showToast();
+      actualizarInterfaz();
     }
 
     function editarReg(i) {
       customPrompt("Editar Fecha:", semanas[i].fecha, "date", (nf) => {
         if (!nf) return;
-        
         customPrompt("Editar Monto (Bs):", semanas[i].monto_bs, "number", (nm) => {
-          const montoNum = parseFloat(nm);
-          if (isNaN(montoNum)) return;
-          
-          const tipoReg = semanas[i].tipo || 'Sueldo';
-          
-          customPrompt(`Editar Tasa BCV (${tipoReg}):`, semanas[i].tasa_sem_of || "", "number", (ntOf) => {
-            customPrompt(`Editar Tasa Par. (${tipoReg}):`, semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
-              semanas[i].fecha = nf;
-              semanas[i].monto_bs = montoNum;
-              
-              const bcvFinal = parseFloat(ntOf);
-              const parFinal = parseFloat(ntPa);
-              
-              if (!isNaN(bcvFinal)) semanas[i].tasa_sem_of = bcvFinal;
-              if (!isNaN(parFinal)) semanas[i].tasa_sem_pa = parFinal;
-              
+          const montoNum = parseFloat(nm); if (isNaN(montoNum)) return;
+          customPrompt("Editar Tasa BCV:", semanas[i].tasa_sem_of || "", "number", (ntOf) => {
+            customPrompt("Editar Tasa Par.:", semanas[i].tasa_sem_pa || "", "number", (ntPa) => {
+              semanas[i].fecha = nf; semanas[i].monto_bs = montoNum;
+              if (!isNaN(parseFloat(ntOf))) semanas[i].tasa_sem_of = parseFloat(ntOf);
+              if (!isNaN(parseFloat(ntPa))) semanas[i].tasa_sem_pa = parseFloat(ntPa);
               semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
               localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-              
-              marcharCambioCategoria(false);
               actualizarInterfaz();
             });
           });
@@ -479,21 +674,119 @@
       });
     }
 
+    function borrarReg(i) { customPrompt("¿Eliminar pago?", "", "confirm", (c) => { if(c){ semanas.splice(i,1); localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); actualizarInterfaz(); } }); }
+    function limpiarFiltros() { document.getElementById('filtro-desde').value = ""; document.getElementById('filtro-hasta').value = ""; actualizarInterfaz(); }
+
+    function agregarGasto() {
+      const f = document.getElementById('gasto_fecha').value;
+      const m = parseFloat(document.getElementById('gasto_monto_bs').value);
+      const cat = document.getElementById('gasto_categoria').value;
+      const tOf = parseFloat(document.getElementById('gasto_tasa_of').value);
+      const tPa = parseFloat(document.getElementById('gasto_tasa_pa').value);
+
+      if(!f || isNaN(m) || isNaN(tOf) || isNaN(tPa)) return customPrompt("Por favor ingresa todos los campos del gasto", "", "alert");
+
+      if (cat === "Ahorro") {
+        const estimadoTeorico = (m / tPa).toFixed(2);
+        
+        customPrompt(`¿Cuántos $ NETOS recibiste en tu billetera? (Descontando comisiones)`, estimadoTeorico, "number", (dolaresNetos) => {
+          const usdReal = parseFloat(dolaresNetos);
+          if (isNaN(usdReal) || usdReal <= 0) {
+            return Toastify({ text: "❌ Registro cancelado: Monto en $ inválido", background: "var(--danger)" }).showToast();
+          }
+
+          gastos.push({ fecha: f, categoria: cat, monto_bs: m, tasa_sem_of: tOf, tasa_sem_pa: tPa, usd_real_meta: usdReal });
+          gastos.sort((a,b) => a.fecha.localeCompare(b.fecha));
+          localStorage.setItem('gastosPersonales', JSON.stringify(gastos));
+
+          ahorroRecaudado += usdReal;
+          localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+
+          document.getElementById('gasto_monto_bs').value = "";
+          Toastify({ text: `💸 Gasto de Ahorro registrado`, duration: 2500, style: { background: "linear-gradient(to right, #d32f2f, #fb8c00)", borderRadius: "10px" } }).showToast();
+          actualizarInterfaz();
+        });
+      } else {
+        gastos.push({ fecha: f, categoria: cat, monto_bs: m, tasa_sem_of: tOf, tasa_sem_pa: tPa });
+        gastos.sort((a,b) => a.fecha.localeCompare(b.fecha));
+        localStorage.setItem('gastosPersonales', JSON.stringify(gastos));
+
+          document.getElementById('gasto_monto_bs').value = "";
+        Toastify({ text: `💸 Gasto en ${cat} registrado`, duration: 2500, style: { background: "linear-gradient(to right, #d32f2f, #fb8c00)", borderRadius: "10px" } }).showToast();
+        actualizarInterfaz();
+      }
+    }
+
+    function editarGastoReg(i) {
+      const catAnterior = gastos[i].categoria;
+      const usdAnteriorMeta = gastos[i].usd_real_meta || 0;
+
+      customPrompt("Editar Fecha Gasto:", gastos[i].fecha, "date", (nf) => {
+        if (!nf) return;
+        customPrompt("Editar Monto Gasto (Bs):", gastos[i].monto_bs, "number", (nm) => {
+          const montoNum = parseFloat(nm); if (isNaN(montoNum)) return;
+          customPrompt("Editar Tasa BCV:", gastos[i].tasa_sem_of || "", "number", (ntOf) => {
+            customPrompt("Editar Tasa Par.:", gastos[i].tasa_sem_pa || "", "number", (ntPa) => {
+              
+              if (catAnterior === "Ahorro") {
+                ahorroRecaudado = Math.max(0, ahorroRecaudado - usdAnteriorMeta);
+              }
+
+              gastos[i].fecha = nf; 
+              gastos[i].monto_bs = montoNum;
+              if (!isNaN(parseFloat(ntOf))) gastos[i].tasa_sem_of = parseFloat(ntOf);
+              if (!isNaN(parseFloat(ntPa))) gastos[i].tasa_sem_pa = parseFloat(ntPa);
+              
+              if (gastos[i].categoria === "Ahorro") {
+                const nuevoEstimado = (gastos[i].monto_bs / (gastos[i].tasa_sem_pa || 1)).toFixed(2);
+                customPrompt("Ajustar $ Netos que entraron a la meta:", nuevoEstimado, "number", (nuevosUsd) => {
+                  const uReal = parseFloat(nuevosUsd) || 0;
+                  gastos[i].usd_real_meta = uReal;
+                  ahorroRecaudado += uReal;
+                  finalizarGuardadoGasto();
+                });
+              } else {
+                if(gastos[i].usd_real_meta) delete gastos[i].usd_real_meta;
+                finalizarGuardadoGasto();
+              }
+
+              function finalizarGuardadoGasto() {
+                gastos.sort((a,b) => a.fecha.localeCompare(b.fecha));
+                localStorage.setItem('gastosPersonales', JSON.stringify(gastos));
+                localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+                actualizarInterfaz();
+              }
+            });
+          });
+        });
+      });
+    }
+
+    function borrarGastoReg(i) { 
+      customPrompt("¿Eliminar gasto?", "", "confirm", (c) => { 
+        if(c){ 
+          if (gastos[i].categoria === "Ahorro") {
+            const usdARestar = gastos[i].usd_real_meta || 0;
+            ahorroRecaudado = Math.max(0, ahorroRecaudado - usdARestar);
+            localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+          }
+          gastos.splice(i,1); 
+          localStorage.setItem('gastosPersonales', JSON.stringify(gastos)); 
+          actualizarInterfaz(); 
+        } 
+      }); 
+    }
+    
+    function limpiarFiltrosGastos() { document.getElementById('gasto-filtro-desde').value = ""; document.getElementById('gasto-filtro-hasta').value = ""; actualizarInterfaz(); }
+
     function actualizarGrafico() {
       const ctx = document.getElementById('graficoMensual').getContext('2d');
       const añoActual = new Date().getFullYear();
-      
-      const sueldosOnly = semanas.filter(s => 
-        (s.tipo === 'Sueldo' || !s.tipo) && 
-        new Date(s.fecha + "T00:00:00").getFullYear() === añoActual
-      );
-      
+      const sueldosOnly = semanas.filter(s => (s.tipo === 'Sueldo' || !s.tipo) && new Date(s.fecha + "T00:00:00").getFullYear() === añoActual);
       const mesesConDatos = [...new Set(sueldosOnly.map(s => new Date(s.fecha + "T00:00:00").getMonth()))].sort((a,b)=>a-b);
       const mIndices = mesesConDatos.length > 0 ? mesesConDatos : [new Date().getMonth()];
       
-      const getVal = (m, t) => sueldosOnly
-        .filter(s => new Date(s.fecha + "T00:00:00").getMonth() === m)
-        .reduce((acc, s) => acc + (s.monto_bs / (t === 'of' ? (s.tasa_sem_of || 1) : (s.tasa_sem_pa || 1))), 0);
+      const getVal = (m, t) => sueldosOnly.filter(s => new Date(s.fecha + "T00:00:00").getMonth() === m).reduce((acc, s) => acc + (s.monto_bs / (t === 'of' ? (s.tasa_sem_of || 1) : (s.tasa_sem_pa || 1))), 0);
       
       if(chartInstance) chartInstance.destroy();
       chartInstance = new Chart(ctx, {
@@ -506,199 +799,88 @@
       });
     }
 
-    // =========================================================
-    // LÓGICA DE ACTUALIZACIÓN INDEPENDIENTE SEMANA A SEMANA
-    // =========================================================
-    function marcharCambioCategoria(mostrarAlerta = true) {
-      const inputFecha = document.getElementById('fecha');
-      const inputBCV = document.getElementById('tasa_registro_of');
-      const inputParalelo = document.getElementById('tasa_registro_pa');
-      
-      if (!inputFecha || !inputFecha.value) return;
+    function actualizarGraficoGastos() {
+      const ctx = document.getElementById('graficoGastos').getContext('2d');
+      const añoActual = new Date().getFullYear();
+      const gastosAño = gastos.filter(g => new Date(g.fecha + "T00:00:00").getFullYear() === añoActual);
+      const mesesConDatos = [...new Set(gastosAño.map(g => new Date(g.fecha + "T00:00:00").getMonth()))].sort((a,b)=>a-b);
+      const mIndices = mesesConDatos.length > 0 ? mesesConDatos : [new Date().getMonth()];
 
-      // SIEMPRE JALA DE LA API EN TIEMPO REAL PARA CUALQUIER CATEGORÍA (INCLUYENDO SUELDO)
-      if (tasaBcvApiDelDia && tasaParaleloApiDelDia) {
-        inputBCV.value = tasaBcvApiDelDia.toFixed(2);
-        inputBCV.style.backgroundColor = "#e0f2f1"; // Fondo verde agua claro (Tasa API libre y fresca)
-        inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
-        inputParalelo.style.backgroundColor = "#ffebee";
-        return;
-      }
+      const getValG = (m, t) => gastosAño.filter(g => new Date(g.fecha + "T00:00:00").getMonth() === m).reduce((acc, g) => acc + (g.monto_bs / (t === 'of' ? (g.tasa_sem_of || 1) : (g.tasa_sem_pa || 1))), 0);
 
-      inputBCV.placeholder = "Cargando...";
-      inputParalelo.placeholder = "Cargando...";
-      inputBCV.style.backgroundColor = "#fff9c4";
-      inputParalelo.style.backgroundColor = "#fff9c4";
-
-      // Fetch Oficial (BCV) en vivo
-      fetch('https://ve.dolarapi.com/v1/dolares/oficial')
-        .then(response => response.json())
-        .then(data => {
-          if (data && data.promedio) {
-            tasaBcvApiDelDia = parseFloat(data.promedio);
-            if (!isNaN(tasaBcvApiDelDia)) {
-              inputBCV.value = tasaBcvApiDelDia.toFixed(2);
-              inputBCV.style.backgroundColor = "#e0f2f1"; 
-              if (mostrarAlerta) {
-                Toastify({ text: `💵 Tasa Oficial BCV: ${tasaBcvApiDelDia.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#0277bd", borderRadius: "10px" } }).showToast();
-              }
-            }
-          }
-        })
-        .catch(() => {
-          inputBCV.placeholder = "0.00";
-          inputBCV.style.backgroundColor = "white";
-        });
-
-      // Fetch Paralelo en vivo
-      cargarTasaParaleloAPI(inputParalelo, mostrarAlerta);
-    }
-
-    function cargarTasaParaleloAPI(inputParalelo, mostrarAlerta) {
-      if (tasaParaleloApiDelDia) {
-        inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
-        inputParalelo.style.backgroundColor = "#ffebee";
-        return;
-      }
-
-      fetch('https://ve.dolarapi.com/v1/dolares/paralelo')
-        .then(response => response.json())
-        .then(data => {
-          if (data && data.promedio) {
-            tasaParaleloApiDelDia = parseFloat(data.promedio);
-            if (!isNaN(tasaParaleloApiDelDia)) {
-              inputParalelo.value = tasaParaleloApiDelDia.toFixed(2);
-              inputParalelo.style.backgroundColor = "#ffebee"; 
-              if (mostrarAlerta) {
-                Toastify({ text: `🔥 Tasa Paralelo: ${tasaParaleloApiDelDia.toFixed(2)}`, duration: 2500, gravity: "top", position: "center", style: { background: "#d32f2f", borderRadius: "10px" } }).showToast();
-              }
-            }
-          }
-        })
-        .catch(() => {
-          inputParalelo.placeholder = "0.00";
-          inputParalelo.style.backgroundColor = "white";
-        });
-    }
-
-    function agregarSemana() {
-      const f = document.getElementById('fecha').value;
-      const m = parseFloat(document.getElementById('monto_bs').value);
-      const t = document.getElementById('tipo_ingreso').value;
-      const tOf = parseFloat(document.getElementById('tasa_registro_of').value);
-      const tPa = parseFloat(document.getElementById('tasa_registro_pa').value);
-      
-      if(!f || isNaN(m) || isNaN(tOf) || isNaN(tPa)) {
-        return customPrompt("Por favor ingresa fecha, monto y ambas tasas", "", "alert");
-      }
-      
-      let nuevo = { fecha: f, monto_bs: m, tipo: t, tasa_sem_of: tOf, tasa_sem_pa: tPa };
-      
-      semanas.push(nuevo); 
-      semanas.sort((a,b) => a.fecha.localeCompare(b.fecha));
-      localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-      
-      document.getElementById('monto_bs').value = ""; 
-      Toastify({ text: `✅ ${t} registrado`, duration: 3000, gravity: "top", position: "center", style: { background: "linear-gradient(to right, #0f3460, #2e7d32)", borderRadius: "10px" } }).showToast();
-
-      marcharCambioCategoria(false);
-      actualizarInterfaz();
-    }
-
-    function borrarReg(i) { 
-      customPrompt("¿Eliminar registro?", "", "confirm", (c) => { 
-        if(c){
-          semanas.splice(i,1); 
-          localStorage.setItem('pagosSemanales', JSON.stringify(semanas)); 
-          actualizarInterfaz();
-        } 
-      }); 
-    }
-
-    function limpiarFiltros() {
-      document.getElementById('filtro-desde').value = "";
-      document.getElementById('filtro-hasta').value = "";
-      actualizarInterfaz();
+      if(chartGastosInstance) chartGastosInstance.destroy();
+      chartGastosInstance = new Chart(ctx, {
+        type: 'bar',
+        data: { labels: mIndices.map(m => NOMBRES_MESES[m]),
+          datasets: [{ label: 'BCV ($)', data: mIndices.map(m => getValG(m, 'of')), backgroundColor: '#fb8c00', borderRadius: 5 },
+                     { label: 'Paralelo ($)', data: mIndices.map(m => getValG(m, 'pa')), backgroundColor: '#e53935', borderRadius: 5 }]
+        },
+        options: { responsive: true, maintainAspectRatio: false }
+      });
     }
 
     function exportarTodo() {
-      if (semanas.length === 0) return customPrompt("No hay datos", "", "alert");
-      customPrompt(`Exportar ${semanas.length} registros. ¿Continuar?`, "", "confirm", (c) => {
+      if (semanas.length === 0 && gastos.length === 0) return customPrompt("No existen registros para exportar", "", "alert");
+      customPrompt(`Vas a exportar el respaldo completo. ¿Continuar?`, "", "confirm", (c) => {
         if(!c) return;
-        let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;USD_BCV;USD_PAR\n";
-        csv += `META;${metaAhorro};${ahorroRecaudado};;;;;\n`;
-        semanas.forEach(s => {
-          const tOf = s.tasa_sem_of || 1;
-          const tPa = s.tasa_sem_pa || 1;
-          csv += `PAGO;${s.fecha};${s.tipo||'Sueldo'};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};${(s.monto_bs/tOf).toFixed(2)};${(s.monto_bs/tPa).toFixed(2)}\n`;
-        });
+        let csv = "\uFEFFMODO;DATO_1;DATO_2;DATO_3;DATO_4;DATO_5;DATO_6\n";
+        csv += `META;${metaAhorro};${ahorroRecaudado};;;;\n`;
+        semanas.forEach(s => { csv += `PAGO;${s.fecha};${s.tipo||'Sueldo'};${s.monto_bs};${s.tasa_sem_of||''};${s.tasa_sem_pa||''};\n`; });
+        gastos.forEach(g => { csv += `GASTO;${g.fecha};${g.categoria};${g.monto_bs};${g.tasa_sem_of||''};${g.tasa_sem_pa||''};${g.usd_real_meta||''}\n`; });
+        
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-        const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
-        link.href = url; link.download = `Respaldo_MisPagos_${new Date().toISOString().split('T')[0]}.csv`;
+        link.href = URL.createObjectURL(blob); link.download = `Respaldo_Total_Finanzas_${new Date().toISOString().split('T')[0]}.csv`;
         link.click();
       });
     }
 
     function importarTodo(input) {
       if(!input.files[0]) return;
-      customPrompt("¿Borrar actuales e importar respaldo?", "", "confirm", (c) => {
+      customPrompt("⚠️ Esto reemplazará todos los ingresos y gastos guardados por los de este archivo. ¿Proceder?", "", "confirm", (c) => {
         if(!c) return;
         const reader = new FileReader();
         reader.onload = (e) => {
           const lineas = e.target.result.replace(/^\uFEFF/, "").split(/\r?\n/);
-          let nP = [];
+          let nP = []; let nG = [];
           lineas.forEach(l => {
             const c = l.trim().split(';');
             if(c[0] === "META") { 
-               metaAhorro = parseFloat(c[1]); 
-               ahorroRecaudado = parseFloat(c[2]);
-               localStorage.setItem('metaAhorro', metaAhorro);
-               localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
-            }
-            else if(c[0] === "PAGO") { 
-               nP.push({ 
-                 fecha: c[1], 
-                 tipo: c[2], 
-                 monto_bs: parseFloat(c[3]), 
-                 tasa_sem_of: parseFloat(c[4]) || null, 
-                 tasa_sem_pa: parseFloat(c[5]) || null 
-               }); 
+               metaAhorro = parseFloat(c[1]) || 0; ahorroRecaudado = parseFloat(c[2]) || 0;
+               localStorage.setItem('metaAhorro', metaAhorro); localStorage.setItem('ahorroRecaudado', ahorroRecaudado);
+            } else if(c[0] === "PAGO") { 
+               nP.push({ fecha: c[1], tipo: c[2], monto_bs: parseFloat(c[3]), tasa_sem_of: parseFloat(c[4]) || null, tasa_sem_pa: parseFloat(c[5]) || null }); 
+            } else if(c[0] === "GASTO") {
+               let nGasto = { fecha: c[1], categoria: c[2], monto_bs: parseFloat(c[3]), tasa_sem_of: parseFloat(c[4]) || null, tasa_sem_pa: parseFloat(c[5]) || null };
+               if(c[6] && c[6] !== "") nGasto.usd_real_meta = parseFloat(c[6]);
+               nG.push(nGasto);
             }
           });
-          if(nP.length > 0) {
-            semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha));
-            localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
-            location.reload();
-          }
+          semanas = nP.sort((a,b) => a.fecha.localeCompare(b.fecha));
+          gastos = nG.sort((a,b) => a.fecha.localeCompare(b.fecha));
+          localStorage.setItem('pagosSemanales', JSON.stringify(semanas));
+          localStorage.setItem('gastosPersonales', JSON.stringify(gastos));
+          location.reload();
         };
         reader.readAsText(input.files[0]);
       });
     }
 
-    function limpiarTodo() { 
-      customPrompt("¿BORRAR TODO permanentemente?", "", "confirm", (c) => { 
-        if(c){
-          localStorage.clear(); 
-          location.reload();
-        } 
-      }); 
-    }
+    function limpiarTodo() { customPrompt("🚨 ¿BORRAR ABSOLUTAMENTE TODO? Perderás configuraciones, metas, pagos y gastos.", "", "confirm", (c) => { if(c){ localStorage.clear(); location.reload(); } }); }
 
-    // --- BLOQUE INICIALIZADOR ---
-    const inputFechaElemento = document.getElementById('fecha');
-    const fechaLocal = new Date();
-    fechaLocal.setMinutes(fechaLocal.getMinutes() - fechaLocal.getTimezoneOffset());
-    inputFechaElemento.value = fechaLocal.toISOString().split('T')[0];
+    const inputFechaI = document.getElementById('fecha');
+    const inputFechaG = document.getElementById('gasto_fecha');
+    const fLoc = new Date(); fLoc.setMinutes(fLoc.getMinutes() - fLoc.getTimezoneOffset());
+    const fStr = fLoc.toISOString().split('T')[0];
+    inputFechaI.value = fStr; inputFechaG.value = fStr;
     
-    inputFechaElemento.addEventListener('change', () => marcharCambioCategoria(false));
-    inputFechaElemento.addEventListener('input', () => marcharCambioCategoria(false));
-    inputFechaElemento.addEventListener('blur', () => marcharCambioCategoria(false));
-
+    inputFechaI.addEventListener('change', () => marcharCambioCategoria(false));
+    inputFechaG.addEventListener('change', () => marcharCambioCategoria(false));
     document.getElementById('tipo_ingreso').addEventListener('change', () => marcharCambioCategoria(true));
+    document.getElementById('gasto_categoria').addEventListener('change', () => marcharCambioCategoria(true));
     
     marcharCambioCategoria(false);
     actualizarInterfaz();
   </script>
-  <script defer src='https://static.cloudflareinsights.com/beacon.min.js' data-cf-beacon='{"token": "009e8b6e3c794e5791ba522bfe4962d2"}'></script></body>
+</body>
 </html>
